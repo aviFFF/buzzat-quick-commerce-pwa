@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import { usePincode } from "@/lib/hooks/use-pincode"
 import { getCategoriesByPincode } from "@/lib/firebase/firestore"
 import ProductSlider from "@/components/product-slider"
-import { Loader2 } from "lucide-react"
+import { Loader2, ChevronRight } from "lucide-react"
 import { collection, getDocs, query, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 
@@ -80,19 +80,22 @@ export default function DynamicCategorySlider() {
     )
   }
 
+  // Limit to 3 categories for mobile view (can be expanded in desktop)
+  const displayCategories = categories.slice(0, 3);
+
   return (
-    <div className="space-y-8">
-      {categories.map(categoryId => (
-        <div key={categoryId} className="my-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">
+    <div className="space-y-6">
+      {displayCategories.map(categoryId => (
+        <div key={categoryId} className="mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-base font-bold text-gray-800">
               {categoryMap[categoryId] || 
                 categoryId.split("-").map(word =>
                   word.charAt(0).toUpperCase() + word.slice(1)
                 ).join(" ")}
             </h2>
-            <a href={`/category/${categoryId}`} className="text-green-600 font-medium">
-              see all
+            <a href={`/category/${categoryId}`} className="text-sm font-medium text-emerald-600 flex items-center">
+              See all <ChevronRight size={16} />
             </a>
           </div>
           <ProductSlider category={categoryId} />

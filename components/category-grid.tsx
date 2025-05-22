@@ -8,14 +8,14 @@ import { Loader2 } from "lucide-react"
 
 // Fallback categories if none are available in the database
 const fallbackCategories = [
-  { id: "fruits-vegetables", name: "Fruits & Vegetables", icon: "/icons/fruits.png" },
-  { id: "dairy-bread-eggs", name: "Dairy, Bread & Eggs", icon: "/icons/dairy.png" },
-  { id: "bakery", name: "Bakery", icon: "/icons/bakery.png" },
+  { id: "fruits-vegetables", name: "Vegetables & Fruits", icon: "/icons/fruits.png" },
+  { id: "dairy-bread-eggs", name: "Milk, Curd & Paneer", icon: "/icons/dairy.png" },
+  { id: "bakery", name: "Drinks & Juices", icon: "/icons/bakery.png" },
   { id: "meat-fish", name: "Meat & Fish", icon: "/icons/meat.png" },
   { id: "masala-oils", name: "Masala and Oils", icon: "/icons/grocery.png" },
   { id: "cleaning-essentials", name: "Cleaning Essentials", icon: "/icons/cleaning.png" },
-  { id: "drinks-juice", name: "Drinks and Juice", icon: "/icons/fruits.png" },
-  { id: "namkeen-biscuits", name: "Namkeen and Biscuits", icon: "/icons/bakery.png" },
+  { id: "drinks-juice", name: "Nutrition Bar", icon: "/icons/fruits.png" },
+  { id: "namkeen-biscuits", name: "Chips & Namkeen", icon: "/icons/bakery.png" },
   { id: "dry-fruits", name: "Dry Fruits", icon: "/icons/grocery.png" },
   { id: "pharma-wellness", name: "Pharma and Wellness", icon: "/icons/cleaning.png" },
   { id: "aata-dal-rice", name: "Aataa Dal Rice", icon: "/icons/grocery.png" },
@@ -100,19 +100,27 @@ export default function CategoryGrid() {
     )
   }
 
+  // Get first rows of categories for mobile display
+  const mainCategories = filteredCategories.slice(0, 6);
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-      {filteredCategories.map((category) => (
+    <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      {mainCategories.map((category) => (
         <Link
           key={category.id}
           href={`/category/${category.id}`}
-          className="flex flex-col items-center p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+          className="flex flex-col items-center"
         >
           <div className="flex flex-col items-center">
-            <div className="relative w-16 h-16 mb-2">
-              <Image src={category.icon || "/logo.webp"} alt={category.name} width={64} height={64} className="object-contain" />
+            <div className="relative w-16 h-16 mb-2 rounded-full bg-white p-2 shadow-sm border border-gray-100">
+              <Image 
+                src={category.icon || "/logo.webp"} 
+                alt={category.name} 
+                fill
+                className="object-contain p-1 rounded-full" 
+              />
             </div>
-            <span className="text-sm text-center font-medium text-gray-800">{category.name}</span>
+            <span className="text-xs text-center font-medium text-gray-800 mt-1">{category.name}</span>
           </div>
         </Link>
       ))}

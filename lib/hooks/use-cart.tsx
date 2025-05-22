@@ -28,6 +28,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [currentPincode, setCurrentPincode] = useState<string>("")
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -39,7 +40,39 @@ export function CartProvider({ children }: { children: ReactNode }) {
         console.error("Failed to parse cart from localStorage:", error)
       }
     }
+    
+    // Store the initial pincode
+    const pincode = localStorage.getItem("pincode")
+    if (pincode) {
+      setCurrentPincode(pincode)
+    }
   }, [])
+  
+  // Check for pincode changes
+  useEffect(() => {
+    const checkPincodeChange = () => {
+      const newPincode = localStorage.getItem("pincode")
+      if (newPincode && currentPincode && newPincode !== currentPincode) {
+        // Pincode has changed, clear cart
+        setCartItems([])
+        setCurrentPincode(newPincode)
+      }
+    }
+    
+    // Set up event listener for storage changes
+    window.addEventListener("storage", checkPincodeChange)
+    
+    // Run once on mount
+    checkPincodeChange()
+    
+    // Regular polling as a fallback (in case storage event doesn't fire)
+    const interval = setInterval(checkPincodeChange, 1000)
+    
+    return () => {
+      window.removeEventListener("storage", checkPincodeChange)
+      clearInterval(interval)
+    }
+  }, [currentPincode])
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {

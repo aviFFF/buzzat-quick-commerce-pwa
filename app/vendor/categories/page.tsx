@@ -252,7 +252,7 @@ export default function VendorCategoriesPage() {
         )}
         
         <h2 className="text-xl font-semibold mt-8">All Available Categories</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4">
           {dbCategories.map((category) => (
             <div key={category.id} className="flex flex-col items-center p-4 bg-white rounded-lg shadow-sm">
               <div className="flex flex-col items-center">

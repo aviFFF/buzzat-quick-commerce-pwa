@@ -26,8 +26,8 @@ export default function CategoryPage() {
     const fetchCategories = async () => {
       setIsLoading(true)
       try {
-        const allCategories = await getAllCategories()
-        setCategories(allCategories as Category[])
+        const allCategories = await getAllCategories() as Category[];
+        setCategories(allCategories);
         
         // Find the current category to display its name
         const currentCategory = allCategories.find(cat => cat.id === slug)
@@ -64,43 +64,38 @@ export default function CategoryPage() {
       <div className="container mx-auto py-6 px-4">
         <h1 className="text-2xl font-bold mb-6">{categoryName || slug}</h1>
         
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Categories Sidebar */}
-          <div className="w-full md:w-64 flex-shrink-0">
-            <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="font-semibold text-lg mb-4">Categories</h2>
-              <ul className="space-y-2">
-                {categories.map((category) => (
-                  <li key={category.id}>
-                    <Link
-                      href={`/category/${category.id}`}
-                      className={`flex items-center p-2 rounded-md ${
-                        category.id === slug 
-                          ? "bg-green-50 text-green-600 font-medium" 
-                          : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <div className="relative w-8 h-8 mr-2">
-                        <Image 
-                          src={category.icon || "/logo.webp"} 
-                          alt={category.name} 
-                          width={32} 
-                          height={32}
-                          className="object-contain" 
-                        />
-                      </div>
-                      <span className="text-sm">{category.name}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+        {/* Horizontal Category Scroller */}
+        <div className="mb-6 overflow-x-auto pb-2 hide-scrollbar">
+          <div className="flex space-x-4">
+            {categories.map((category) => (
+              <Link
+                key={category.id}
+                href={`/category/${category.id}`}
+                className="flex flex-col items-center min-w-[80px]"
+              >
+                <div className={`relative w-16 h-16 mb-2 rounded-full overflow-hidden flex-shrink-0 ${
+                  category.id === slug ? 'border-2 border-green-500' : 'border border-gray-200'
+                }`}>
+                  <Image 
+                    src={category.icon || "/logo.webp"} 
+                    alt={category.name}
+                    fill
+                    className="object-contain p-2" 
+                  />
+                </div>
+                <span className={`text-xs text-center ${
+                  category.id === slug ? 'font-semibold text-green-600' : 'text-gray-700'
+                }`}>
+                  {category.name}
+                </span>
+              </Link>
+            ))}
           </div>
-
-          {/* Products Grid */}
-          <div className="flex-1">
-            <ProductGrid category={slug} />
-          </div>
+        </div>
+        
+        {/* Products Grid */}
+        <div className="flex-1">
+          <ProductGrid category={slug} />
         </div>
       </div>
     </main>
