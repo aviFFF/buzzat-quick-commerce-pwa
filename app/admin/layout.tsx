@@ -5,7 +5,7 @@ import type React from "react"
 import type { ReactNode } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { BarChart3, Home, Package, Settings, ShoppingBag, Users, LogOut, Layers } from "lucide-react"
+import { BarChart3, Home, Package, Settings, ShoppingBag, Users, LogOut, Layers, Image } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth } from "firebase/auth"
 import AdminAuthCheck from "@/components/admin/admin-auth-check"
@@ -46,6 +46,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <NavItem href="/admin/categories" icon={<Layers size={18} />} label="Categories" />
             <NavItem href="/admin/products" icon={<Package size={18} />} label="Products" />
             <NavItem href="/admin/orders" icon={<ShoppingBag size={18} />} label="Orders" />
+            <NavItem href="/admin/banner-cards" icon={<Image size={18} />} label="Banner Cards" />
             <NavItem href="/admin/analytics" icon={<BarChart3 size={18} />} label="Analytics" />
             <NavItem href="/admin/settings" icon={<Settings size={18} />} label="Settings" />
           </nav>

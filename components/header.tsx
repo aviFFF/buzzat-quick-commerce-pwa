@@ -19,6 +19,7 @@ import { useCart } from "@/lib/hooks/use-cart"
 import { useAuth } from "@/lib/context/auth-context"
 import { useFirebase } from "@/lib/context/firebase-provider"
 import { LoginModal } from "./auth/login-modal"
+import PincodeSelector from "./pincode-selector"
 
 export default function Header() {
   const { cartItems, cartCount } = useCart()
@@ -42,15 +43,25 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 bg-white border-b shadow-sm">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center">
-          <Image src="/logo.webp" alt="Buzzat" width={100} height={40} className="h-20" priority />
-        </Link>
+        <div className="flex items-center">
+          <Link href="/" className="flex items-center">
+            <Image src="/logo.webp" alt="Buzzat" width={100} height={40} className="h-20" priority />
+          </Link>
+          
+          <div className="hidden md:block ml-4">
+            <PincodeSelector headerStyle={true} />
+          </div>
+        </div>
+
+        <div className="md:hidden flex-1 flex justify-center">
+          <PincodeSelector headerStyle={true} />
+        </div>
 
         <div className="hidden md:flex relative w-1/2 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
           <Input
             type="search"
-            placeholder="Search for groceries..."
+            placeholder="Search for your needs..."
             className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 focus:border-green-500 focus:ring-1 focus:ring-green-500"
           />
         </div>
@@ -149,7 +160,7 @@ export default function Header() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
           <Input
             type="search"
-            placeholder="Search for groceries..."
+            placeholder="Search for your needs..."
             className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300"
           />
         </div>

@@ -13,15 +13,17 @@ interface SidebarNavItemProps {
   href: string
   icon: React.ReactNode
   label: string
+  onClick?: () => void
 }
 
-function SidebarNavItem({ href, icon, label }: SidebarNavItemProps) {
+function SidebarNavItem({ href, icon, label, onClick }: SidebarNavItemProps) {
   const pathname = usePathname()
   const isActive = pathname === href
 
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all hover:text-primary",
         isActive ? "bg-muted font-medium text-primary" : "text-muted-foreground"
@@ -33,7 +35,11 @@ function SidebarNavItem({ href, icon, label }: SidebarNavItemProps) {
   )
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavItemClick?: () => void
+}
+
+export function Sidebar({ onNavItemClick }: SidebarProps) {
   const { logout } = useVendor()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const router = useRouter()
@@ -59,41 +65,49 @@ export function Sidebar() {
             href="/vendor"
             icon={<Home className="h-4 w-4" />}
             label="Dashboard"
+            onClick={onNavItemClick}
           />
           <SidebarNavItem
             href="/vendor/products"
             icon={<Package className="h-4 w-4" />}
             label="Products"
+            onClick={onNavItemClick}
           />
           <SidebarNavItem
             href="/vendor/categories"
             icon={<Grid className="h-4 w-4" />}
             label="Categories"
+            onClick={onNavItemClick}
           />
           <SidebarNavItem
             href="/vendor/orders"
             icon={<ShoppingBag className="h-4 w-4" />}
             label="Orders"
+            onClick={onNavItemClick}
           />
           <SidebarNavItem
             href="/vendor/profile"
             icon={<User className="h-4 w-4" />}
             label="Profile"
+            onClick={onNavItemClick}
           />
           <SidebarNavItem
             href="/vendor/profile/pincodes"
             icon={<MapPin className="h-4 w-4" />}
             label="Delivery Areas"
+            onClick={onNavItemClick}
           />
           <SidebarNavItem
             href="/vendor/analytics"
             icon={<BarChart3 className="h-4 w-4" />}
             label="Analytics"
+            onClick={onNavItemClick}
           />
           <SidebarNavItem
             href="/vendor/settings"
             icon={<Settings className="h-4 w-4" />}
             label="Settings"
+            onClick={onNavItemClick}
           />
         </div>
       </div>
@@ -101,7 +115,10 @@ export function Sidebar() {
         <Button
           variant="outline"
           className="w-full justify-start text-muted-foreground"
-          onClick={handleLogout}
+          onClick={() => {
+            handleLogout();
+            onNavItemClick?.();
+          }}
           disabled={isLoggingOut}
         >
           <LogOut className="mr-2 h-4 w-4" />

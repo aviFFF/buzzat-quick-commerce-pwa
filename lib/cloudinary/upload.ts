@@ -22,7 +22,13 @@ export const uploadProductImage = async (file: File, vendorId: string, attempt =
 }> => {
   try {
     if (!isCloudinaryConfigured()) {
-      throw new Error('Cloudinary is not properly configured. Please check your environment variables.');
+      console.error("Cloudinary configuration missing. Env vars:", {
+        cloudName: !!cloudinaryConfig.cloudName,
+        apiKey: !!cloudinaryConfig.apiKey,
+        apiSecret: !!cloudinaryConfig.apiSecret,
+        uploadPreset: cloudinaryConfig.uploadPreset
+      });
+      throw new Error('Cloudinary is not properly configured. Please contact the administrator.');
     }
 
     const timestamp = Date.now();
@@ -40,6 +46,86 @@ export const uploadProductImage = async (file: File, vendorId: string, attempt =
     
     // Add metadata
     formData.append('context', `vendorId=${vendorId}|originalName=${file.name}`);
+    
+    console.log(`Uploading to Cloudinary with preset: ${cloudinaryConfig.uploadPreset}`);
+    
+    // Upload to Cloudinary using their upload API
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Cloudinary API error:", errorData);
+      throw new Error(errorData.error?.message || 'Failed to upload to Cloudinary');
+    }
+    
+    const data = await response.json();
+    
+    return { 
+      success: true, 
+      url: data.secure_url,
+      public_id: data.public_id 
+    };
+  } catch (error: any) {
+    console.error(`Error uploading product image (attempt ${attempt}/${MAX_RETRIES}):`, error);
+    
+    // Retry if not exceeded max attempts
+    if (attempt < MAX_RETRIES) {
+      console.log(`Retrying upload after ${RETRY_DELAY}ms...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      return uploadProductImage(file, vendorId, attempt + 1);
+    }
+    
+    return { 
+      success: false, 
+      error,
+      errorCode: error.code || 'unknown',
+      errorMessage: error.message || 'Unknown error during upload'
+    };
+  }
+};
+
+/**
+ * Uploads an image from a URL to Cloudinary with retry capability
+ * @param imageUrl The URL of the image to upload
+ * @param vendorId The vendor ID to associate with the file
+ * @param attempt Current retry attempt (internal use)
+ * @returns Object with success status, URL, and public_id
+ */
+export const uploadImageFromUrl = async (imageUrl: string, vendorId: string, attempt = 1): Promise<{
+  success: boolean;
+  url?: string;
+  public_id?: string;
+  error?: any;
+  errorCode?: string;
+  errorMessage?: string;
+}> => {
+  try {
+    if (!isCloudinaryConfigured()) {
+      throw new Error('Cloudinary is not properly configured. Please check your environment variables.');
+    }
+
+    const timestamp = Date.now();
+    const fileName = `${timestamp}_from_url`;
+    
+    console.log(`Uploading image from URL to Cloudinary (attempt ${attempt}/${MAX_RETRIES}): ${imageUrl}`);
+    
+    // Create form data for upload
+    const formData = new FormData();
+    formData.append('file', imageUrl);
+    formData.append('upload_preset', cloudinaryConfig.uploadPreset);
+    formData.append('folder', `${cloudinaryConfig.folder}/${vendorId}`);
+    formData.append('public_id', fileName);
+    
+    // Add metadata
+    formData.append('context', `vendorId=${vendorId}|sourceUrl=${imageUrl}`);
+    
+    console.log(`Uploading to Cloudinary with preset: ${cloudinaryConfig.uploadPreset}`);
     
     // Upload to Cloudinary using their upload API
     const response = await fetch(
@@ -63,13 +149,13 @@ export const uploadProductImage = async (file: File, vendorId: string, attempt =
       public_id: data.public_id 
     };
   } catch (error: any) {
-    console.error(`Error uploading product image (attempt ${attempt}/${MAX_RETRIES}):`, error);
+    console.error(`Error uploading image from URL (attempt ${attempt}/${MAX_RETRIES}):`, error);
     
     // Retry if not exceeded max attempts
     if (attempt < MAX_RETRIES) {
       console.log(`Retrying upload after ${RETRY_DELAY}ms...`);
       await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-      return uploadProductImage(file, vendorId, attempt + 1);
+      return uploadImageFromUrl(imageUrl, vendorId, attempt + 1);
     }
     
     return { 
@@ -198,8 +284,27 @@ export const deleteProductImage = async (public_id: string, attempt = 1): Promis
  */
 export const checkCloudinaryConfig = async () => {
   try {
+    // Check each required configuration parameter
+    const configStatus = {
+      cloudName: !!cloudinaryConfig.cloudName,
+      apiKey: !!cloudinaryConfig.apiKey,
+      apiSecret: !!cloudinaryConfig.apiSecret,
+      uploadPreset: !!cloudinaryConfig.uploadPreset,
+    };
+    
+    // Log configuration status for debugging
+    console.log("Cloudinary configuration status:", configStatus);
+    
     if (!isCloudinaryConfigured()) {
-      return { configured: false, error: 'Missing Cloudinary configuration' };
+      const missingParams = Object.entries(configStatus)
+        .filter(([_, value]) => !value)
+        .map(([key]) => key);
+        
+      return { 
+        configured: false,
+        error: `Missing Cloudinary configuration: ${missingParams.join(', ')}`,
+        details: configStatus
+      };
     }
     
     // Create a small test file
@@ -210,9 +315,16 @@ export const checkCloudinaryConfig = async () => {
     const result = await uploadProductImage(testFile, 'config-test');
     
     // If successful, we can consider the configuration working
-    return { configured: result.success };
-  } catch (error) {
+    return { 
+      configured: result.success,
+      details: result.success ? null : { errorMessage: result.errorMessage }
+    };
+  } catch (error: any) {
     console.error("Cloudinary configuration check failed:", error);
-    return { configured: false, error };
+    return { 
+      configured: false, 
+      error: error.message || 'Unknown error checking configuration',
+      details: { stack: error.stack }
+    };
   }
-}; 
+};

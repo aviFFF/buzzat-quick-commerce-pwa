@@ -5,7 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useVendor } from "@/lib/context/vendor-provider"
 import { db } from "@/lib/firebase/config"
-import { collection, query, where, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -47,16 +47,45 @@ interface Product {
   vendorId: string
   pincodes?: string[]
   status: "active" | "out_of_stock" | "deleted"
+  categoryName?: string
+}
+
+interface Category {
+  id: string
+  name: string
+  icon: string
 }
 
 export default function VendorProductsPage() {
   const { vendor } = useVendor()
   const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Record<string, Category>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [editingProduct, setEditingProduct] = useState<{ id: string, price: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const categoriesQuery = query(collection(db, "categories"))
+        const snapshot = await getDocs(categoriesQuery)
+        
+        const categoriesData: Record<string, Category> = {}
+        snapshot.docs.forEach(doc => {
+          categoriesData[doc.id] = { id: doc.id, ...doc.data() } as Category
+        })
+        
+        setCategories(categoriesData)
+      } catch (error) {
+        console.error("Error fetching categories:", error)
+      }
+    }
+    
+    fetchCategories()
+  }, [])
 
   // Fetch products for this vendor
   useEffect(() => {
@@ -79,7 +108,19 @@ export default function VendorProductsPage() {
           ...doc.data()
         })) as Product[]
 
-        setProducts(productsData)
+        // Enhance products with category names
+        const enhancedProducts = productsData.map(product => {
+          // If the category is a valid category ID and exists in our categories object
+          if (categories[product.category]) {
+            return {
+              ...product,
+              categoryName: categories[product.category].name
+            }
+          }
+          return product
+        })
+
+        setProducts(enhancedProducts)
       } catch (error: any) {
         setError(`Error loading products: ${error.message}`)
       } finally {
@@ -88,7 +129,7 @@ export default function VendorProductsPage() {
     }
 
     fetchProducts()
-  }, [vendor])
+  }, [vendor, categories])
 
   // Toggle product status (in stock / out of stock)
   const toggleProductStatus = async (productId: string, currentStatus: Product["status"]) => {
@@ -308,7 +349,7 @@ export default function VendorProductsPage() {
                         <span className="font-medium">{product.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{product.category}</TableCell>
+                    <TableCell>{product.categoryName || product.category}</TableCell>
                     <TableCell>
                       {editingProduct?.id === product.id ? (
                         <div className="flex items-center space-x-2">

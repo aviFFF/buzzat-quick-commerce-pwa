@@ -1,15 +1,16 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useVendor } from "@/lib/context/vendor-provider"
-import { db } from "@/lib/firebase/config"
-import { doc, getDoc, updateDoc } from "firebase/firestore"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ArrowLeft, Phone, User, MapPin, CreditCard } from "lucide-react"
+import { useState, useEffect } from "react";
+import React from "react";
+import { useRouter } from "next/navigation";
+import { useVendor } from "@/lib/context/vendor-provider";
+import { db } from "@/lib/firebase/config";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Phone, User, MapPin, CreditCard } from "lucide-react";
 
 const ORDER_STATUS_COLORS = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -19,7 +20,7 @@ const ORDER_STATUS_COLORS = {
   out_for_delivery: "bg-orange-100 text-orange-800",
   delivered: "bg-green-100 text-green-800",
   cancelled: "bg-red-100 text-red-800"
-}
+};
 
 const ORDER_STATUS_LABELS = {
   pending: "Pending",
@@ -29,7 +30,7 @@ const ORDER_STATUS_LABELS = {
   out_for_delivery: "Out for Delivery",
   delivered: "Delivered",
   cancelled: "Cancelled"
-}
+};
 
 const ORDER_STATUS_SEQUENCE = [
   "pending",
@@ -38,131 +39,135 @@ const ORDER_STATUS_SEQUENCE = [
   "ready",
   "out_for_delivery",
   "delivered"
-]
+];
 
 interface OrderItem {
-  id: string
-  name: string
-  price: number
-  quantity: number
-  options?: { [key: string]: string }
-  image?: string
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  options?: { [key: string]: string };
+  image?: string;
 }
 
 interface Order {
-  id: string
-  orderNumber: string
-  createdAt: any
-  customerName: string
-  customerPhone: string
-  customerAddress?: string
-  items: OrderItem[]
-  subtotal: number
-  deliveryFee: number
-  total: number
-  orderStatus: keyof typeof ORDER_STATUS_COLORS
-  notes?: string
-  paymentMethod: string
-  paymentStatus: string
-  vendorId: string
+  id: string;
+  orderNumber: string;
+  createdAt: any;
+  customerName: string;
+  customerPhone: string;
+  customerAddress?: string;
+  items: OrderItem[];
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+  orderStatus: keyof typeof ORDER_STATUS_COLORS;
+  notes?: string;
+  paymentMethod: string;
+  paymentStatus: string;
+  vendorId: string;
 }
 
 export default function OrderDetail({ params }: { params: { id: string } }) {
-  const router = useRouter()
-  const { vendor } = useVendor()
-  const [order, setOrder] = useState<Order | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState(false)
+  const router = useRouter();
+  const { vendor } = useVendor();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  
+  // Unwrap params using React.use()
+  const unwrappedParams = React.use(params);
+  const orderId = unwrappedParams.id;
 
   useEffect(() => {
-    if (!vendor) return
+    if (!vendor) return;
 
     const fetchOrder = async () => {
       try {
-        setLoading(true)
-        const orderDoc = await getDoc(doc(db, "orders", params.id))
+        setLoading(true);
+        const orderDoc = await getDoc(doc(db, "orders", orderId));
 
         if (orderDoc.exists()) {
-          const orderData = orderDoc.data() as Omit<Order, "id">
+          const orderData = orderDoc.data() as Omit<Order, "id">;
 
           // Verify this order belongs to the vendor
           if (orderData.vendorId !== vendor.id) {
-            console.error("This order does not belong to this vendor")
-            router.push("/vendor/orders")
-            return
+            console.error("This order does not belong to this vendor");
+            router.push("/vendor/orders");
+            return;
           }
 
-          setOrder({ id: orderDoc.id, ...orderData } as Order)
+          setOrder({ id: orderDoc.id, ...orderData } as Order);
         } else {
-          console.error("Order not found")
-          router.push("/vendor/orders")
+          console.error("Order not found");
+          router.push("/vendor/orders");
         }
       } catch (error) {
-        console.error("Error fetching order:", error)
+        console.error("Error fetching order:", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchOrder()
-  }, [params.id, vendor, router])
+    fetchOrder();
+  }, [orderId, vendor, router]);
 
   const handleUpdateStatus = async (newStatus: string) => {
-    if (!order || updating) return
+    if (!order || updating) return;
 
-    setUpdating(true)
+    setUpdating(true);
     try {
       await updateDoc(doc(db, "orders", order.id), {
         orderStatus: newStatus
-      })
+      });
 
       setOrder({
         ...order,
         orderStatus: newStatus as keyof typeof ORDER_STATUS_COLORS
-      })
+      });
     } catch (error) {
-      console.error("Error updating order status:", error)
+      console.error("Error updating order status:", error);
     } finally {
-      setUpdating(false)
+      setUpdating(false);
     }
-  }
+  };
 
   const handleCancelOrder = async () => {
-    if (!order || updating) return
+    if (!order || updating) return;
 
-    if (!window.confirm("Are you sure you want to cancel this order?")) return
+    if (!window.confirm("Are you sure you want to cancel this order?")) return;
 
-    setUpdating(true)
+    setUpdating(true);
     try {
       await updateDoc(doc(db, "orders", order.id), {
         orderStatus: "cancelled"
-      })
+      });
 
       setOrder({
         ...order,
         orderStatus: "cancelled"
-      })
+      });
     } catch (error) {
-      console.error("Error cancelling order:", error)
+      console.error("Error cancelling order:", error);
     } finally {
-      setUpdating(false)
+      setUpdating(false);
     }
-  }
+  };
 
   const getNextStatus = () => {
-    if (!order) return null
+    if (!order) return null;
 
-    const currentIndex = ORDER_STATUS_SEQUENCE.indexOf(order.orderStatus)
+    const currentIndex = ORDER_STATUS_SEQUENCE.indexOf(order.orderStatus);
 
     if (currentIndex === -1 || currentIndex === ORDER_STATUS_SEQUENCE.length - 1) {
-      return null
+      return null;
     }
 
-    return ORDER_STATUS_SEQUENCE[currentIndex + 1]
-  }
+    return ORDER_STATUS_SEQUENCE[currentIndex + 1];
+  };
 
   if (!vendor) {
-    return <div>Loading...</div>
+    return <div>Loading...</div>;
   }
 
   if (loading) {
@@ -170,7 +175,7 @@ export default function OrderDetail({ params }: { params: { id: string } }) {
       <div className="flex justify-center items-center min-h-[400px]">
         <p>Loading order details...</p>
       </div>
-    )
+    );
   }
 
   if (!order) {
@@ -178,14 +183,14 @@ export default function OrderDetail({ params }: { params: { id: string } }) {
       <div className="flex justify-center items-center min-h-[400px]">
         <p>Order not found</p>
       </div>
-    )
+    );
   }
 
   const formattedDate = order.createdAt?.toDate ?
     new Date(order.createdAt.toDate()).toLocaleString() :
-    'Unknown date'
+    'Unknown date';
 
-  const nextStatus = getNextStatus()
+  const nextStatus = getNextStatus();
 
   return (
     <div className="space-y-6">
@@ -198,101 +203,71 @@ export default function OrderDetail({ params }: { params: { id: string } }) {
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Order #{order.orderNumber || order.id.slice(0, 6)}</h1>
-          <p className="text-gray-500">{formattedDate}</p>
+          <h1 className="text-2xl font-bold">Order #{order.orderNumber}</h1>
+          <p className="text-muted-foreground">{formattedDate}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {order.orderStatus !== "cancelled" && order.orderStatus !== "delivered" && nextStatus && (
-            <Button
-              onClick={() => handleUpdateStatus(nextStatus)}
-              disabled={updating}
-            >
-              Mark as {ORDER_STATUS_LABELS[nextStatus as keyof typeof ORDER_STATUS_LABELS]}
-            </Button>
-          )}
 
-          {order.orderStatus !== "cancelled" && order.orderStatus !== "delivered" && (
-            <Button
-              variant="destructive"
-              onClick={handleCancelOrder}
-              disabled={updating}
-            >
-              Cancel Order
-            </Button>
-          )}
-        </div>
+        <Badge className={`${ORDER_STATUS_COLORS[order.orderStatus]} text-sm px-3 py-1 rounded-full`}>
+          {ORDER_STATUS_LABELS[order.orderStatus]}
+        </Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle className="flex justify-between items-center">
-                <span>Order Items</span>
-                <Badge className={ORDER_STATUS_COLORS[order.orderStatus] || ""}>
-                  {ORDER_STATUS_LABELS[order.orderStatus] || order.orderStatus}
-                </Badge>
-              </CardTitle>
+              <CardTitle>Order Items</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {order.items.map((item, index) => (
-                  <div key={index} className="flex justify-between pb-4 border-b last:border-0">
-                    <div className="flex gap-4">
-                      {item.image && (
-                        <div className="h-16 w-16 rounded-md overflow-hidden bg-gray-100 flex-shrink-0">
-                          <img
-                            src={item.image}
-                            alt={item.name}
-                            className="h-full w-full object-cover"
-                          />
+                  <div key={index} className="flex justify-between items-center">
+                    <div className="flex-1">
+                      <div className="font-medium">{item.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {item.quantity} × ₹{item.price.toFixed(2)}
+                      </div>
+                      {item.options && Object.entries(item.options).length > 0 && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {Object.entries(item.options).map(([key, value]) => (
+                            <span key={key}>
+                              {key}: {value}
+                            </span>
+                          )).reduce((prev, curr) => (
+                            <>
+                              {prev}, {curr}
+                            </>
+                          ))}
                         </div>
                       )}
-                      <div>
-                        <h3 className="font-medium">{item.name}</h3>
-                        <p className="text-gray-500 text-sm">Qty: {item.quantity}</p>
-                        {item.options && Object.entries(item.options).length > 0 && (
-                          <div className="text-sm text-gray-500">
-                            {Object.entries(item.options).map(([key, value]) => (
-                              <span key={key}>{key}: {value}, </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
                     </div>
-                    <p className="font-medium">${(item.price * item.quantity).toFixed(2)}</p>
+                    <div className="text-right">
+                      ₹{(item.price * item.quantity).toFixed(2)}
+                    </div>
                   </div>
                 ))}
-              </div>
 
-              <div className="mt-6 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal</span>
-                  <span>${order.subtotal?.toFixed(2) || '0.00'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Delivery Fee</span>
-                  <span>${order.deliveryFee?.toFixed(2) || '0.00'}</span>
-                </div>
                 <Separator />
-                <div className="flex justify-between font-bold">
-                  <span>Total</span>
-                  <span>${order.total?.toFixed(2) || '0.00'}</span>
+
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-muted-foreground">Subtotal</div>
+                  <div>₹{order.subtotal.toFixed(2)}</div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-muted-foreground">Delivery Fee</div>
+                  <div>₹{order.deliveryFee.toFixed(2)}</div>
+                </div>
+
+                <Separator />
+
+                <div className="flex justify-between items-center font-medium">
+                  <div>Total</div>
+                  <div>₹{order.total.toFixed(2)}</div>
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          {order.notes && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>{order.notes}</p>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         <div className="space-y-6">
@@ -300,62 +275,81 @@ export default function OrderDetail({ params }: { params: { id: string } }) {
             <CardHeader>
               <CardTitle>Customer Information</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <User className="h-5 w-5 text-gray-500 mt-0.5" />
-                  <div>
-                    <h3 className="font-medium">Customer</h3>
-                    <p className="text-gray-600">{order.customerName || 'Not provided'}</p>
-                  </div>
+            <CardContent className="space-y-4">
+              <div className="flex items-start">
+                <User className="h-5 w-5 mt-0.5 mr-2 text-muted-foreground" />
+                <div>
+                  <div className="font-medium">{order.customerName}</div>
                 </div>
-
-                <div className="flex items-start gap-3">
-                  <Phone className="h-5 w-5 text-gray-500 mt-0.5" />
-                  <div>
-                    <h3 className="font-medium">Phone</h3>
-                    <p className="text-gray-600">{order.customerPhone || 'Not provided'}</p>
-                  </div>
-                </div>
-
-                {order.customerAddress && (
-                  <div className="flex items-start gap-3">
-                    <MapPin className="h-5 w-5 text-gray-500 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium">Delivery Address</h3>
-                      <p className="text-gray-600">{order.customerAddress}</p>
-                    </div>
-                  </div>
-                )}
               </div>
+
+              <div className="flex items-start">
+                <Phone className="h-5 w-5 mt-0.5 mr-2 text-muted-foreground" />
+                <div>
+                  <div className="font-medium">{order.customerPhone}</div>
+                </div>
+              </div>
+
+              {order.customerAddress && (
+                <div className="flex items-start">
+                  <MapPin className="h-5 w-5 mt-0.5 mr-2 text-muted-foreground flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">Delivery Address</div>
+                    <div className="text-sm text-muted-foreground">{order.customerAddress}</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start">
+                <CreditCard className="h-5 w-5 mt-0.5 mr-2 text-muted-foreground" />
+                <div>
+                  <div className="font-medium">Payment Method</div>
+                  <div className="text-sm text-muted-foreground">
+                    {order.paymentMethod} • <span className={order.paymentStatus === "paid" ? "text-green-600" : "text-yellow-600"}>
+                      {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {order.notes && (
+                <div className="pt-2">
+                  <div className="font-medium">Notes:</div>
+                  <div className="text-sm text-muted-foreground">{order.notes}</div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Payment Information</CardTitle>
+              <CardTitle>Order Actions</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <CreditCard className="h-5 w-5 text-gray-500 mt-0.5" />
-                  <div>
-                    <h3 className="font-medium">Payment Method</h3>
-                    <p className="text-gray-600">{order.paymentMethod || 'Not provided'}</p>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <h3 className="font-medium">Payment Status</h3>
-                  <Badge variant={order.paymentStatus === "paid" ? "outline" : "destructive"} className={order.paymentStatus === "paid" ? "bg-green-100 text-green-800" : ""}>
-                    {order.paymentStatus || 'Unknown'}
-                  </Badge>
-                </div>
-              </div>
+            <CardContent className="space-y-4">
+              {order.orderStatus !== "cancelled" && nextStatus && (
+                <Button 
+                  className="w-full"
+                  onClick={() => handleUpdateStatus(nextStatus)}
+                  disabled={updating}
+                >
+                  Mark as {ORDER_STATUS_LABELS[nextStatus as keyof typeof ORDER_STATUS_LABELS]}
+                </Button>
+              )}
+              
+              {order.orderStatus !== "delivered" && order.orderStatus !== "cancelled" && (
+                <Button 
+                  variant="destructive" 
+                  className="w-full"
+                  onClick={handleCancelOrder}
+                  disabled={updating}
+                >
+                  Cancel Order
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
     </div>
-  )
+  );
 } 

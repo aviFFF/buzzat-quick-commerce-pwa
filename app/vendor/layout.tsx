@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
-import { BarChart3, Home, Package, Settings, ShoppingBag, User } from "lucide-react"
+import { BarChart3, Home, Package, Settings, ShoppingBag, User, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VendorProvider, useVendor } from "@/lib/context/vendor-provider"
 import { Sidebar } from "@/components/vendor/sidebar"
 import Spinner from "@/components/ui/spinner"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
 // Redirect component that handles vendor authentication status
 function VendorAuthRedirect({ children }: { children: React.ReactNode }) {
@@ -73,6 +74,7 @@ function VendorAuthRedirect({ children }: { children: React.ReactNode }) {
 
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Check if it's the login page
   const isLoginPage = pathname === "/vendor/login"
@@ -85,33 +87,45 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
           <main className="h-screen">{children}</main>
         ) : (
           <div className="flex min-h-screen flex-col">
+            {/* Mobile Header with hamburger menu */}
+            <header className="sticky top-0 z-40 border-b bg-background md:hidden">
+              <div className="flex h-16 items-center px-4">
+                <div className="flex items-center justify-between w-full">
+                  <Link href="/vendor" className="font-semibold text-lg flex items-center">
+                    <ShoppingBag className="mr-2 h-5 w-5" />
+                    <span>Vendor Portal</span>
+                  </Link>
+                  
+                  <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="icon" className="md:hidden">
+                        <Menu className="h-5 w-5" />
+                        <span className="sr-only">Toggle Menu</span>
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="pr-0 sm:max-w-xs">
+                      <div className="px-2">
+                        <Sidebar onNavItemClick={() => setSidebarOpen(false)} />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </div>
+              </div>
+            </header>
+            
             <div className="container flex-1 items-start md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10">
-              <Sidebar />
-              <main className="relative py-6">{children}</main>
+              {/* Desktop sidebar - hidden on mobile */}
+              <aside className="fixed top-0 z-30 hidden h-screen w-[220px] border-r bg-background px-2 py-4 md:sticky md:block lg:w-[240px]">
+                <Sidebar />
+              </aside>
+              
+              <main className="relative flex-1 py-6 md:gap-10 md:py-8">
+                {children}
+              </main>
             </div>
           </div>
         )}
       </VendorAuthRedirect>
     </VendorProvider>
   )
-}
-
-function NavItem({
-  href,
-  icon,
-  label,
-}: {
-  href: string
-  icon: React.ReactNode
-  label: string
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-3 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
-    >
-      {icon}
-      <span>{label}</span>
-    </Link>
-  )
-}
+} 

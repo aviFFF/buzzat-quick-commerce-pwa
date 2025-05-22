@@ -44,6 +44,9 @@ export default function AddProductPage() {
   const additionalFileInputRef = useRef<HTMLInputElement>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [loadingCategories, setLoadingCategories] = useState(true)
+  const [imageUploadMode, setImageUploadMode] = useState<'file' | 'url'>('file')
+  const [primaryImageUrl, setPrimaryImageUrl] = useState<string>('')
+  const [additionalImageUrls, setAdditionalImageUrls] = useState<string[]>([])
 
   // Form state
   const [formData, setFormData] = useState({
@@ -223,7 +226,73 @@ export default function AddProductPage() {
     }
   }
 
-  // Handle form submission
+  // Add a function to handle primary image URL input
+  const handlePrimaryImageUrl = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value
+    setPrimaryImageUrl(url)
+    
+    // If the URL is valid, update the preview
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      setPrimaryImagePreview(url)
+      // Reset file input
+      setPrimaryImage(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    } else {
+      // Clear preview if URL is not valid
+      if (primaryImagePreview === url) {
+        setPrimaryImagePreview(null)
+      }
+    }
+  }
+
+  // Add a function to add additional image URL
+  const handleAddAdditionalImageUrl = () => {
+    if (!additionalImageUrls.length) {
+      setAdditionalImageUrls([''])
+    } else if (additionalImageUrls.length < 2) {
+      setAdditionalImageUrls([...additionalImageUrls, ''])
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Too many images",
+        description: "You can add a maximum of 2 additional images"
+      })
+    }
+  }
+
+  // Add a function to update additional image URL
+  const handleAdditionalImageUrl = (index: number, url: string) => {
+    const newUrls = [...additionalImageUrls]
+    newUrls[index] = url
+    setAdditionalImageUrls(newUrls)
+    
+    // Update preview if URL is valid
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      const newPreviews = [...additionalImagePreviews]
+      if (index >= newPreviews.length) {
+        newPreviews.push(url)
+      } else {
+        newPreviews[index] = url
+      }
+      setAdditionalImagePreviews(newPreviews)
+    } else {
+      // Remove preview if URL is not valid
+      const newPreviews = additionalImagePreviews.filter((_, i) => i !== index)
+      setAdditionalImagePreviews(newPreviews)
+    }
+  }
+
+  // Add a function to remove additional image URL
+  const removeAdditionalImageUrl = (index: number) => {
+    setAdditionalImageUrls(prev => prev.filter((_, i) => i !== index))
+    setAdditionalImagePreviews(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // Modify the handleSubmit function to use URL uploads when in URL mode
+  // Inside handleSubmit, replace the image upload section with this:
+  // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -232,8 +301,21 @@ export default function AddProductPage() {
     
     try {
       // Validate form
-      if (!formData.name || !formData.category || !formData.price || !formData.stock || !primaryImage) {
-        setError("Please fill in all required fields and upload a primary image")
+      if (!formData.name || !formData.category || !formData.price || !formData.stock) {
+        setError("Please fill in all required fields")
+        setIsSubmitting(false)
+        return
+      }
+      
+      // Validate image - either file or URL must be provided
+      if (imageUploadMode === 'file' && !primaryImage) {
+        setError("Please upload a primary product image")
+        setIsSubmitting(false)
+        return
+      }
+      
+      if (imageUploadMode === 'url' && (!primaryImageUrl || !primaryImageUrl.trim())) {
+        setError("Please provide a valid image URL")
         setIsSubmitting(false)
         return
       }
@@ -253,23 +335,54 @@ export default function AddProductPage() {
       
       let productImageUrl = ""
       let productImageId = ""
-      let additionalImageUrls: string[] = []
+      let additionalImageResults: string[] = []
       let additionalImageIds: string[] = []
       
       // 1. Upload primary image to Cloudinary
       setUploadProgress(10)
-      const imageUploadResult = await uploadProductImage(primaryImage, vendor?.id || 'unknown')
       
-      if (!imageUploadResult.success) {
-        throw new Error(`Failed to upload primary image: ${imageUploadResult.errorMessage}`)
+      if (imageUploadMode === 'file' && primaryImage) {
+        // Upload file
+        const imageUploadResult = await uploadProductImage(primaryImage, vendor?.id || 'unknown')
+        
+        if (!imageUploadResult.success) {
+          throw new Error(`Failed to upload primary image: ${imageUploadResult.errorMessage}`)
+        }
+        
+        productImageUrl = imageUploadResult.url || ""
+        productImageId = imageUploadResult.public_id || ""
+      } else if (imageUploadMode === 'url' && primaryImageUrl) {
+        // Upload from URL
+        try {
+          const uploadResult = await fetch('/api/upload-from-url', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              imageUrl: primaryImageUrl,
+              vendorId: vendor?.id || 'unknown'
+            }),
+          });
+          
+          if (!uploadResult.ok) {
+            const errorData = await uploadResult.json();
+            throw new Error(errorData.message || 'Failed to upload from URL');
+          }
+          
+          const data = await uploadResult.json();
+          productImageUrl = data.url;
+          productImageId = data.public_id;
+        } catch (error: any) {
+          throw new Error(`Failed to upload from URL: ${error.message}`);
+        }
       }
-      
-      productImageUrl = imageUploadResult.url || ""
-      productImageId = imageUploadResult.public_id || ""
       
       // 2. Upload additional images if any
       setUploadProgress(50)
-      if (additionalImages.length > 0) {
+      
+      if (imageUploadMode === 'file' && additionalImages.length > 0) {
+        // Upload additional files
         const additionalUploadsResult = await uploadMultipleProductImages(
           additionalImages, 
           vendor?.id || 'unknown',
@@ -280,13 +393,40 @@ export default function AddProductPage() {
         )
         
         if (additionalUploadsResult.success) {
-          additionalImageUrls = additionalUploadsResult.results
+          additionalImageResults = additionalUploadsResult.results
             .filter(r => r.success)
             .map(r => r.url || "")
           
           additionalImageIds = additionalUploadsResult.results
             .filter(r => r.success)
             .map(r => r.public_id || "")
+        }
+      } else if (imageUploadMode === 'url' && additionalImageUrls.length > 0) {
+        // Upload additional URLs
+        for (const url of additionalImageUrls.filter(url => url.trim())) {
+          try {
+            const uploadResult = await fetch('/api/upload-from-url', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                imageUrl: url,
+                vendorId: vendor?.id || 'unknown'
+              }),
+            });
+            
+            if (!uploadResult.ok) {
+              console.error('Failed to upload additional image from URL');
+              continue;
+            }
+            
+            const data = await uploadResult.json();
+            additionalImageResults.push(data.url);
+            additionalImageIds.push(data.public_id);
+          } catch (error) {
+            console.error('Error uploading additional image from URL:', error);
+          }
         }
       }
       
@@ -303,7 +443,7 @@ export default function AddProductPage() {
         unit: formData.unit,
         image: productImageUrl,
         imageId: productImageId,
-        additionalImages: additionalImageUrls,
+        additionalImages: additionalImageResults,
         additionalImageIds: additionalImageIds,
         pincodes: selectedPincodes,
         vendorId: vendor?.id,
@@ -523,6 +663,34 @@ export default function AddProductPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Upload mode selector */}
+              <div className="flex space-x-4 mb-4">
+                <div className="flex items-center">
+                  <input
+                    type="radio"
+                    id="upload-file"
+                    name="upload-mode"
+                    value="file"
+                    className="mr-2"
+                    checked={imageUploadMode === 'file'}
+                    onChange={() => setImageUploadMode('file')}
+                  />
+                  <label htmlFor="upload-file">Upload from device</label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="radio"
+                    id="upload-url"
+                    name="upload-mode"
+                    value="url"
+                    className="mr-2"
+                    checked={imageUploadMode === 'url'}
+                    onChange={() => setImageUploadMode('url')}
+                  />
+                  <label htmlFor="upload-url">Image URL</label>
+                </div>
+              </div>
+
               {/* Primary Image Section */}
               <div>
                 <Label className="block mb-2 font-medium">Primary Image (Required)</Label>
@@ -543,21 +711,35 @@ export default function AddProductPage() {
                     </div>
                   )}
 
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handlePrimaryImageChange}
-                  />
+                  {imageUploadMode === 'file' ? (
+                    <>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePrimaryImageChange}
+                      />
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={triggerFileInput}
-                  >
-                    {primaryImagePreview ? "Change Primary Image" : "Upload Primary Image"}
-                  </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={triggerFileInput}
+                      >
+                        {primaryImagePreview ? "Change Primary Image" : "Upload Primary Image"}
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="w-full mt-4">
+                      <Input
+                        id="image-url"
+                        placeholder="https://example.com/image.jpg"
+                        value={primaryImageUrl}
+                        onChange={handlePrimaryImageUrl}
+                        className="w-full mb-2"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

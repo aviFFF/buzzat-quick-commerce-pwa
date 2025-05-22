@@ -11,7 +11,11 @@ import { usePincode } from "@/lib/hooks/use-pincode"
 import { isPincodeServiceable } from "@/lib/firebase/firestore"
 import { useRouter } from "next/navigation"
 
-export default function PincodeSelector() {
+interface PincodeSelectorProps {
+  headerStyle?: boolean;
+}
+
+export default function PincodeSelector({ headerStyle = false }: PincodeSelectorProps) {
   const { pincode, updatePincode, isLoading } = usePincode()
   const [inputPincode, setInputPincode] = useState("")
   const [open, setOpen] = useState(false)
@@ -59,7 +63,7 @@ export default function PincodeSelector() {
 
   if (isLoading) {
     return (
-      <div className="py-4">
+      <div className={headerStyle ? "" : "py-4"}>
         <Button variant="ghost" className="text-blue-600 p-0 h-auto font-normal" disabled>
           <MapPin size={16} className="mr-1" />
           <span>Loading...</span>
@@ -69,14 +73,16 @@ export default function PincodeSelector() {
   }
 
   return (
-    <div className="py-4">
+    <div className={headerStyle ? "" : "py-4"}>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="ghost" className="text-blue-600 p-0 h-auto font-normal">
-            <MapPin size={16} className="mr-1" />
-            <span>Delivery to: </span>
-            <span className="font-medium ml-1">{pincode}</span>
-            <span className="font-medium ml-1 text-green-600">Change</span>
+          <Button variant="ghost" className={`text-blue-600 flex-col font-normal ${headerStyle ? "text-xs md:text-sm" : ""}`}>
+            <div className="flex items-center">
+              <MapPin size={headerStyle ? 14 : 16} className="mr-1" />
+              <span>Delivery to: </span>
+              <span className="font-medium ml-1">{pincode}</span>
+            </div>
+            <span className="font-medium text-green-600 block mt-1">Change Pincode</span>
           </Button>
         </DialogTrigger>
         <DialogContent>

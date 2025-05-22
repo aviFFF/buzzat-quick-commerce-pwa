@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, ChangeEvent } from "react"
 import { useRouter } from "next/navigation"
+import React from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -61,9 +62,12 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const [originalProduct, setOriginalProduct] = useState<ProductData | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [loadingCategories, setLoadingCategories] = useState(true)
+  const [imageUploadMode, setImageUploadMode] = useState<'file' | 'url'>('file')
+  const [imageUrl, setImageUrl] = useState<string>('')
   
-  // Store the ID in a ref to avoid direct params access in useEffect
-  const productId = params.id
+  // Unwrap params object using React.use()
+  const unwrappedParams = React.use(params)
+  const productId = unwrappedParams.id
   
   // Prevent clipboard errors in some browsers
   useEffect(() => {
@@ -110,7 +114,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           // Return mock data after a short delay to simulate API call
           setTimeout(() => {
             const mockProduct: ProductData = {
-              id: params.id,
+              id: unwrappedParams.id,
               name: 'Test Product',
               description: 'This is a test product description.',
               category: 'grocery',
@@ -154,7 +158,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         }
 
         // Fetch the real product from Firestore
-        const productDoc = await getDoc(doc(db, "products", params.id));
+        const productDoc = await getDoc(doc(db, "products", unwrappedParams.id));
 
         if (!productDoc.exists()) {
           throw new Error("Product not found");
@@ -253,6 +257,27 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     }
   }
 
+  // Handle image URL input
+  const handleImageUrl = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value
+    setImageUrl(url)
+    
+    // If the URL is valid, update the preview
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      setImagePreview(url)
+      // Reset file input
+      setImageFile(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    } else {
+      // Clear preview if URL is invalid and it's the current preview
+      if (imagePreview === url) {
+        setImagePreview(null)
+      }
+    }
+  }
+
   // Trigger file input click
   const triggerFileInput = () => {
     if (fileInputRef.current) {
@@ -285,8 +310,9 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       return
     }
 
-    // Check if Cloudinary is configured
-    if (!isCloudinaryConfigured()) {
+    // Only check Cloudinary configuration if we're uploading a new image
+    if ((imageUploadMode === 'file' && imageFile || imageUploadMode === 'url' && imageUrl) && 
+        !isCloudinaryConfigured()) {
       setError("Cloudinary is not properly configured. Please contact the administrator.")
       setIsSubmitting(false)
       return
@@ -296,8 +322,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       let imageUrl = originalProduct.image
       let imagePublicId = originalProduct.imagePublicId
 
-      // If new image uploaded, update it
-      if (imageFile) {
+      // If new image is uploaded or a URL is provided
+      if (imageUploadMode === 'file' && imageFile) {
         setUploadProgress(10)
 
         // Delete old image if public_id exists
@@ -310,7 +336,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           }
         }
 
-        // Upload new image
+        // Upload new image file
         const uploadResult = await uploadProductImage(imageFile, vendor.id)
 
         if (!uploadResult.success || !uploadResult.url) {
@@ -320,6 +346,44 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         imageUrl = uploadResult.url
         imagePublicId = uploadResult.public_id
         setUploadProgress(50)
+      } else if (imageUploadMode === 'url' && imageUrl && imageUrl.trim()) {
+        setUploadProgress(10)
+
+        // Delete old image if public_id exists
+        if (originalProduct.imagePublicId) {
+          try {
+            await deleteProductImage(originalProduct.imagePublicId)
+          } catch (error) {
+            console.error("Failed to delete old image:", error)
+            // Continue anyway
+          }
+        }
+
+        // Upload from URL
+        try {
+          const uploadResult = await fetch('/api/upload-from-url', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              imageUrl: imageUrl.trim(),
+              vendorId: vendor.id
+            }),
+          });
+          
+          if (!uploadResult.ok) {
+            const errorData = await uploadResult.json();
+            throw new Error(errorData.message || 'Failed to upload from URL');
+          }
+          
+          const data = await uploadResult.json();
+          imageUrl = data.url;
+          imagePublicId = data.public_id;
+          setUploadProgress(50);
+        } catch (error: any) {
+          throw new Error(`Failed to upload from URL: ${error.message}`);
+        }
       } else {
         setUploadProgress(50) // Skip image upload steps
       }
@@ -558,6 +622,34 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
               <CardDescription>Update the product image or keep the existing one.</CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Upload mode selector */}
+              <div className="flex space-x-4 mb-4">
+                <div className="flex items-center">
+                  <input
+                    type="radio"
+                    id="upload-file"
+                    name="upload-mode"
+                    value="file"
+                    className="mr-2"
+                    checked={imageUploadMode === 'file'}
+                    onChange={() => setImageUploadMode('file')}
+                  />
+                  <label htmlFor="upload-file">Upload from device</label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="radio"
+                    id="upload-url"
+                    name="upload-mode"
+                    value="url"
+                    className="mr-2"
+                    checked={imageUploadMode === 'url'}
+                    onChange={() => setImageUploadMode('url')}
+                  />
+                  <label htmlFor="upload-url">Image URL</label>
+                </div>
+              </div>
+              
               <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 mb-4">
                 {imagePreview ? (
                   <div className="relative h-48 w-48 mb-4">
@@ -575,22 +667,37 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                   </div>
                 )}
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageChange}
-                />
+                {imageUploadMode === 'file' ? (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageChange}
+                    />
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={triggerFileInput}
-                  className="mt-2"
-                >
-                  {imagePreview ? "Change Image" : "Upload Image"}
-                </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={triggerFileInput}
+                      className="mt-2"
+                    >
+                      {imagePreview ? "Change Image" : "Upload Image"}
+                    </Button>
+                  </>
+                ) : (
+                  <div className="w-full mt-4">
+                    <Label htmlFor="image-url">Image URL</Label>
+                    <Input
+                      id="image-url"
+                      placeholder="https://example.com/image.jpg"
+                      value={imageUrl}
+                      onChange={handleImageUrl}
+                      className="w-full mt-1"
+                    />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

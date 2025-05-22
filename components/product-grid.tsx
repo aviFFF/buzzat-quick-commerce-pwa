@@ -2,12 +2,13 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Plus } from "lucide-react"
+import { Plus, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/hooks/use-cart"
 import { getProductsByPincode } from "@/lib/firebase/firestore"
 import { usePincode } from "@/lib/hooks/use-pincode"
 import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 interface Product {
   id: string
@@ -22,6 +23,7 @@ export default function ProductGrid({ category }: { category: string }) {
   const { pincode } = usePincode()
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [addedProducts, setAddedProducts] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -60,6 +62,20 @@ export default function ProductGrid({ category }: { category: string }) {
     fetchProducts()
   }, [category, pincode])
 
+  const handleAddToCart = (product: Product) => {
+    addToCart(product)
+    console.log("Product added to cart:", product)
+    
+    // Show temporary visual feedback
+    setAddedProducts(prev => ({ ...prev, [product.id]: true }))
+    toast.success(`Added ${product.name} to cart`)
+    
+    // Reset after animation
+    setTimeout(() => {
+      setAddedProducts(prev => ({ ...prev, [product.id]: false }))
+    }, 1500)
+  }
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
@@ -93,13 +109,21 @@ export default function ProductGrid({ category }: { category: string }) {
             <span className="font-bold">₹{product.price}</span>
             <Button
               size="icon"
-              className="h-8 w-8 rounded-full bg-green-500 hover:bg-green-600"
+              className={`h-8 w-8 rounded-full transition-all ${
+                addedProducts[product.id] 
+                  ? "bg-green-600 hover:bg-green-700" 
+                  : "bg-green-500 hover:bg-green-600"
+              }`}
               onClick={(e) => {
                 e.preventDefault()
-                addToCart(product)
+                handleAddToCart(product)
               }}
             >
-              <Plus size={16} />
+              {addedProducts[product.id] ? (
+                <Check size={16} className="text-white" />
+              ) : (
+                <Plus size={16} />
+              )}
             </Button>
           </div>
         </div>

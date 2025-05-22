@@ -167,9 +167,6 @@ export default function VendorLogin() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl text-center">Vendor Login</CardTitle>
-          <CardDescription className="text-center">
-            Enter your credentials to access your vendor dashboard
-          </CardDescription>
         </CardHeader>
         <CardContent>
           {error && (
@@ -249,21 +246,9 @@ export default function VendorLogin() {
             >
               {isSubmitting ? "Logging in..." : "Login"}
             </Button>
-          </form>
-
-          {/* Emergency bypass for development mode */}
-          {process.env.NODE_ENV === 'development' && (
-            <>
-              <DirectTestLogin />
-              <LoginDebug />
-            </>
-          )}
+          </form>        
+        
         </CardContent>
-        <CardFooter className="text-center text-sm text-gray-500">
-          <p className="w-full">
-            Your vendor account must be created and approved by an administrator before you can log in.
-          </p>
-        </CardFooter>
       </Card>
     </div>
   )
