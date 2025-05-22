@@ -52,6 +52,9 @@ export default function CategoryGrid() {
       }
 
       try {
+        if (!db) {
+          throw new Error("Firestore instance not available")
+        }
         const q = query(collection(db, "categories"), orderBy("name"))
         const querySnapshot = await getDocs(q)
         

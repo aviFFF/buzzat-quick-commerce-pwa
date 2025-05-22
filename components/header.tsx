@@ -6,7 +6,7 @@ import Image from "next/image"
 import { Search, ShoppingCart, User, LogOut, ChevronDown, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -168,6 +168,7 @@ export default function Header() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="bottom" className="h-[80vh] rounded-t-xl px-0">
+                <SheetTitle className="sr-only">Shopping Cart</SheetTitle>
                 <div className="flex justify-center mb-2">
                   <div className="w-12 h-1.5 bg-gray-300 rounded-full mt-1"></div>
                 </div>
@@ -265,18 +266,6 @@ export default function Header() {
           </DialogContent>
         </Dialog>
         
-        {/* Delivery time indicator */}
-        <div className="bg-amber-100 rounded-lg mx-4 p-3 my-3 flex items-center">
-          <div className="font-bold text-gray-800">
-            <span className="block">Delivery in</span>
-            <span className="text-lg">{deliveryTime} minutes</span>
-          </div>
-          <div className="ml-auto flex items-center text-xs rounded-full">
-            <Clock size={16} className="text-gray-600 mr-1" />
-            <span className="font-medium">Fastest Delivery</span>
-          </div>
-        </div>
-
         {/* Search bar for mobile */}
         <div className="px-4 py-2">
           <div className="relative">
@@ -367,6 +356,7 @@ export default function Header() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="bottom" className="h-[80vh] rounded-t-xl px-0">
+                <SheetTitle className="sr-only">Shopping Cart</SheetTitle>
                 <div className="flex justify-center mb-2">
                   <div className="w-12 h-1.5 bg-gray-300 rounded-full mt-1"></div>
                 </div>

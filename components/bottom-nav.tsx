@@ -16,12 +16,7 @@ export default function BottomNav() {
           label="Home"
           isActive={pathname === "/"}
         />
-        <NavItem 
-          href="/categories" 
-          icon={<Grid size={24} />} 
-          label="Categories"
-          isActive={pathname.startsWith("/category")}
-        />
+                <NavItem           href="/category/fruits-vegetables"           icon={<Grid size={24} />}           label="Categories"          isActive={pathname.startsWith("/category")}        />
         <NavItem 
           href="/account/orders" 
           icon={<Clock size={24} />} 

@@ -1,14 +1,13 @@
 import { Suspense } from "react"
 import Header from "@/components/header"
 import CategoryGrid from "@/components/category-grid"
-import ProductSlider from "@/components/product-slider"
 import { Skeleton } from "@/components/ui/skeleton"
 import DynamicCategorySlider from "@/components/dynamic-category-slider"
 import CheckPincodeRedirect from "@/components/check-pincode-redirect"
 import BannerCardsDisplay from "@/components/banner-cards-display"
 import BannerCard from "@/components/banner-card"
-import { BannerCardProps } from "@/components/banner-card"
 import BottomNav from "@/components/bottom-nav"
+import DeliveryBanner from "@/components/delivery-banner"
 
 // Define categories to be displayed on the homepage
 const featuredCategories = [
@@ -28,50 +27,43 @@ const featuredCategories = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gray-50 pb-16">
-      <Header />
-      <div className="container mx-auto px-4">
-        {/* Check if pincode is serviceable and redirect if not */}
-        <CheckPincodeRedirect />
-
-        {/* Main featured banner (replaces Frequently bought section) */}
-        <div className="mt-4b block md:hidden mb-6">
-          <Suspense fallback={<BannerSkeleton />}>
-            <BannerCard 
-              title="Special Offers & Discounts" 
-              imageUrl="https://images.unsplash.com/photo-1542838132-92c53300491e?q=80"
-              link="/category/offers"
-              className="w-full"
-            />
-          </Suspense>
-        </div>
-
-        {/* Categories grid with rounded icons */}
-        <div className="my-6">
-          <Suspense fallback={<CategorySkeleton />}>
-            <CategoryGrid />
-          </Suspense>
-        </div>
-
-        {/* Banner Cards - desktop view (multiple banners) and mobile view (top banner) */}
+    <main className="min-h-screen bg-gray-50 pb-16">      <Header />      <div className="container mx-auto py-2 px-4">        {/* Check if pincode is serviceable and redirect if not */}        <CheckPincodeRedirect />                {/* Scrolling Delivery Banner */}        <DeliveryBanner />        {/* Main featured banner (replaces Frequently bought section) */}
+      <div className="mt-4b block md:hidden mb-6">
         <Suspense fallback={<BannerSkeleton />}>
-          <BannerCardsDisplay />
-        </Suspense>
-
-        {/* Dynamic Category Slider that shows only categories with available products */}
-        <div className="my-8">
-          <h2 className="font-bold text-lg mb-3">For You</h2>
-          <Suspense fallback={<ProductSliderSkeleton />}>
-            <DynamicCategorySlider />
-          </Suspense>
-        </div>
-
-        {/* Bottom card for mobile view */}
-        <Suspense fallback={<div className="md:hidden my-6"><Skeleton className="w-full h-32 rounded-lg" /></div>}>
-          <MobilePositionCard position="bottom" />
+          <BannerCard
+            title="Special Offers & Discounts"
+            imageUrl="https://images.unsplash.com/photo-1542838132-92c53300491e?q=80"
+            link="/category/offers"
+            className="w-full"
+          />
         </Suspense>
       </div>
-      
+
+      {/* Categories grid with rounded icons */}
+      <div className="my-6">
+        <Suspense fallback={<CategorySkeleton />}>
+          <CategoryGrid />
+        </Suspense>
+      </div>
+
+      {/* Banner Cards - desktop view (multiple banners) and mobile view (top banner) */}
+      <Suspense fallback={<BannerSkeleton />}>
+        <BannerCardsDisplay />
+      </Suspense>
+
+      {/* Dynamic Category Slider that shows only categories with available products */}
+      <div className="my-8">
+        <Suspense fallback={<ProductSliderSkeleton />}>
+          <DynamicCategorySlider />
+        </Suspense>
+      </div>
+
+      {/* Bottom card for mobile view */}
+      <Suspense fallback={<div className="md:hidden my-6"><Skeleton className="w-full h-32 rounded-lg" /></div>}>
+        <MobilePositionCard position="bottom" />
+      </Suspense>
+    </div>
+
       {/* Bottom Navigation */}
       <BottomNav />
     </main>
@@ -92,16 +84,16 @@ function MobilePositionCard({ position }: { position: 'middle' | 'bottom' }) {
             Explore →
           </div>
         </div>
-        
+
         {/* Fallback image */}
-        <img 
-          src={position === 'middle' 
-            ? "https://images.unsplash.com/photo-1628088062854-d1870b4553da" 
+        <img
+          src={position === 'middle'
+            ? "https://images.unsplash.com/photo-1628088062854-d1870b4553da"
             : "https://images.unsplash.com/photo-1579113800032-c38bd7635818"}
           alt={position === 'middle' ? 'Dairy Products' : 'Grocery & Staples'}
           className="object-cover w-full h-full"
         />
-        
+
         {/* Dynamic content will replace this via JavaScript */}
         <script
           dangerouslySetInnerHTML={{

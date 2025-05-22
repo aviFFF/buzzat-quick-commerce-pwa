@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { VendorProvider, useVendor } from "@/lib/context/vendor-provider"
 import { Sidebar } from "@/components/vendor/sidebar"
 import Spinner from "@/components/ui/spinner"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 
 // Redirect component that handles vendor authentication status
 function VendorAuthRedirect({ children }: { children: React.ReactNode }) {
@@ -104,6 +104,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
                       </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="pr-0 sm:max-w-xs">
+                      <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                       <div className="px-2">
                         <Sidebar onNavItemClick={() => setSidebarOpen(false)} />
                       </div>
