@@ -14,17 +14,47 @@ export const usePincode = () => {
     const storedPincode = localStorage.getItem("pincode")
     setPincode(storedPincode || DEFAULT_PINCODE)
     setIsLoading(false)
+    
+    // Listen for pincode changes from other tabs/windows
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "pincode") {
+        setPincode(e.newValue || DEFAULT_PINCODE)
+      }
+    }
+    
+    window.addEventListener("storage", handleStorageChange)
+    return () => window.removeEventListener("storage", handleStorageChange)
   }, [])
 
   // Save pincode to localStorage when it changes
   const updatePincode = (newPincode: string) => {
+    // Don't update if it's the same pincode
+    if (newPincode === pincode) return;
+    
     // Update state
     setPincode(newPincode)
     
     // Save to localStorage
     localStorage.setItem("pincode", newPincode)
     
-    // The page reload is now handled in the PincodeSelector component
+    // Manually dispatch storage event to notify other tabs/components
+    // This helps with components in the same tab that are listening for storage events
+    try {
+      const storageEvent = new StorageEvent("storage", {
+        key: "pincode",
+        newValue: newPincode,
+        oldValue: pincode,
+        storageArea: localStorage,
+      });
+      window.dispatchEvent(storageEvent);
+    } catch (e) {
+      // Fallback for browsers that don't support StorageEvent constructor
+      // Just dispatch a custom event
+      const event = new CustomEvent("pincodeChange", { 
+        detail: { newPincode, oldPincode: pincode } 
+      });
+      window.dispatchEvent(event);
+    }
   }
 
   return {

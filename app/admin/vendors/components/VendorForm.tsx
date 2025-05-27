@@ -36,6 +36,7 @@ interface VendorFormProps {
     status: string
     joinedDate?: string
     productsCount?: number
+    deliveryMessage?: string
   }
   onSuccess?: () => void
   onCancel?: () => void
@@ -48,6 +49,7 @@ interface FormData {
   pincodes: string
   status: string
   password: string
+  deliveryMessage: string
 }
 
 export function VendorForm({ vendor, onSuccess, onCancel }: VendorFormProps) {
@@ -61,6 +63,7 @@ export function VendorForm({ vendor, onSuccess, onCancel }: VendorFormProps) {
     pincodes: vendor?.pincodes?.join(", ") || "",
     status: vendor?.status || "pending",
     password: "",
+    deliveryMessage: vendor?.deliveryMessage || "Delivery in 8 minutes",
   })
 
   // Use our custom hook for connection status
@@ -134,8 +137,11 @@ export function VendorForm({ vendor, onSuccess, onCancel }: VendorFormProps) {
             joinedDate: new Date().toISOString(),
             createdAt: serverTimestamp(),
             uid: userCredential.user.uid,
-            role: "vendor"
+            role: "vendor",
+            deliveryMessage: formData.deliveryMessage
           }
+
+          console.log("Saving vendor with pincodes:", vendorData.pincodes);
 
           // Use the retry utility for better error handling
           const vendorId = `vendor_${userCredential.user.uid}`;
@@ -162,8 +168,11 @@ export function VendorForm({ vendor, onSuccess, onCancel }: VendorFormProps) {
           phone: formData.phone,
           pincodes: formData.pincodes.split(",").map((p) => p.trim()).filter(p => p),
           status: formData.status,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
+          deliveryMessage: formData.deliveryMessage
         }
+
+        console.log("Updating vendor with pincodes:", vendorData.pincodes);
 
         // Use the retry utility for better error handling
         await retryFirestoreOperation(async () => {
@@ -304,6 +313,20 @@ export function VendorForm({ vendor, onSuccess, onCancel }: VendorFormProps) {
             />
             <p className="text-xs text-gray-500">
               These are the areas where this vendor can deliver products. Vendors will only be able to make their products available in these pincodes.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="deliveryMessage">Delivery Message</Label>
+            <Textarea
+              id="deliveryMessage"
+              value={formData.deliveryMessage}
+              onChange={(e) => setFormData({ ...formData, deliveryMessage: e.target.value })}
+              placeholder="Delivery in 8 minutes"
+              required
+            />
+            <p className="text-xs text-gray-500">
+              This message will be displayed to customers when they order from this vendor.
             </p>
           </div>
 

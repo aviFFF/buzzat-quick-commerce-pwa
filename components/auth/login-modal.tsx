@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { signInWithPhoneNumber, verifyOTP, initRecaptchaVerifier } from "@/lib/firebase/auth"
 import { useFirebase } from "@/lib/context/firebase-provider"
+import { useRouter } from "next/navigation"
 
 export function LoginModal({ onClose }: { onClose: () => void }) {
   const [phoneNumber, setPhoneNumber] = useState("")
@@ -20,6 +21,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
   const recaptchaContainerRef = useRef<HTMLDivElement>(null)
   const recaptchaVerifierRef = useRef<any>(null)
   const { isAuthInitialized, isLoading: firebaseLoading } = useFirebase()
+  const router = useRouter()
 
   useEffect(() => {
     // Initialize recaptcha when component mounts, only on client side, and after Firebase Auth is initialized
@@ -101,7 +103,18 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
       const { success, error } = await verifyOTP(verificationId, verificationCode)
 
       if (success) {
+        // Close the modal
         onClose()
+        
+        // Check if we need to redirect to checkout
+        const shouldRedirectToCheckout = localStorage.getItem("redirect_to_checkout")
+        if (shouldRedirectToCheckout === "true") {
+          localStorage.removeItem("redirect_to_checkout")
+          // Add a small delay to ensure auth state is updated
+          setTimeout(() => {
+            router.push("/checkout")
+          }, 500)
+        }
       } else {
         setError((error as { message?: string })?.message || "Invalid verification code. Please try again.")
       }
@@ -128,7 +141,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md z-[100]">
         <DialogHeader className="text-center">
           <div className="mx-auto mb-4">
             <Image src="/logo.webp" alt="Buzzat" width={60} height={60} className="mx-auto" />

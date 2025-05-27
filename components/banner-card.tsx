@@ -23,7 +23,7 @@ export default function BannerCard({ title, imageUrl, link, className }: Omit<Ba
       transition={{ duration: 0.3 }}
     >
       <Link href={link}>
-        <div className="relative aspect-[16/9] md:aspect-[21/9]">
+        <div className="relative aspect-[16/9] md:aspect-[21/7]">
           <Image
             src={imageUrl}
             alt={title}

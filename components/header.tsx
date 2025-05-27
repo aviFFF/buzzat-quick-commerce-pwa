@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { Search, ShoppingCart, User, LogOut, ChevronDown, Clock } from "lucide-react"
+import { Search, ShoppingCart, User, LogOut, ChevronDown, Clock, MapPin, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
@@ -32,6 +32,7 @@ import { usePincode } from "@/lib/hooks/use-pincode"
 import { isPincodeServiceable } from "@/lib/firebase/firestore"
 import { useRouter } from "next/navigation"
 import CartItem from "./cart-item"
+import { ProductSearch } from "./product-search"
 
 export default function Header() {
   const { cartItems, cartCount, clearCart } = useCart()
@@ -47,6 +48,11 @@ export default function Header() {
   const [isChecking, setIsChecking] = useState(false)
   const router = useRouter()
   
+  // Address related state
+  const [address, setAddress] = useState("")
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false)
+  const [useCurrentLocation, setUseCurrentLocation] = useState(false)
+  
   // Estimate delivery time (would come from admin/backend)
   const [deliveryTime, setDeliveryTime] = useState("8")
 
@@ -57,11 +63,161 @@ export default function Header() {
     // Update input pincode when pincode changes
     if (pincode) {
       setInputPincode(pincode)
+      // Fetch address for the pincode
+      fetchAddressFromPincode(pincode)
     }
   }, [pincode])
 
   const handleSignOut = async () => {
-    await signOut()
+    try {
+      const result = await signOut();
+      if (result.success) {
+        // Clear any checkout redirects
+        localStorage.removeItem("redirect_to_checkout");
+        // Force a refresh to ensure auth state is updated
+        router.refresh();
+      } else {
+        console.error("Sign out failed:", result.error);
+      }
+    } catch (error) {
+      console.error("Error during sign out:", error);
+    }
+  }
+  
+  // Fetch address from pincode using Google Maps API
+  const fetchAddressFromPincode = async (pincode: string) => {
+    if (!pincode) return
+    
+    setIsLoadingAddress(true)
+    try {
+      // Using Google Maps Geocoding API
+      const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${pincode}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`)
+      const data = await response.json()
+      
+      if (data.status === "OK" && data.results && data.results.length > 0) {
+        const formattedAddress = data.results[0].formatted_address
+        setAddress(formattedAddress)
+        // Save address to localStorage for future use
+        localStorage.setItem(`address_${pincode}`, formattedAddress)
+      } else {
+        // If no results, check if we have a cached address
+        const cachedAddress = localStorage.getItem(`address_${pincode}`)
+        if (cachedAddress) {
+          setAddress(cachedAddress)
+        } else {
+          setAddress("")
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching address:", error)
+      // Try to use cached address if available
+      const cachedAddress = localStorage.getItem(`address_${pincode}`)
+      if (cachedAddress) {
+        setAddress(cachedAddress)
+      } else {
+        setAddress("")
+      }
+    } finally {
+      setIsLoadingAddress(false)
+    }
+  }
+  
+  // Get current location and find pincode
+  const getCurrentLocation = () => {
+    setUseCurrentLocation(true)
+    
+    if (navigator.geolocation) {
+      setIsLoadingAddress(true)
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords
+            
+            // Use reverse geocoding to get address and pincode
+            const response = await fetch(
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+            )
+            
+            const data = await response.json()
+            
+            if (data.status === "OK" && data.results && data.results.length > 0) {
+              // Extract pincode from address components
+              let foundPincode = ""
+              let formattedAddress = data.results[0].formatted_address
+              
+              // Look for postal_code in address components
+              for (const result of data.results) {
+                for (const component of result.address_components) {
+                  if (component.types.includes("postal_code")) {
+                    foundPincode = component.long_name
+                    break
+                  }
+                }
+                if (foundPincode) break
+              }
+              
+              if (foundPincode) {
+                setInputPincode(foundPincode)
+                setAddress(formattedAddress)
+                // Save address to localStorage
+                localStorage.setItem(`address_${foundPincode}`, formattedAddress)
+                
+                // Check if the pincode is serviceable
+                setIsChecking(true)
+                try {
+                  // Check if pincode is changing
+                  if (pincode !== foundPincode) {
+                    // Clear cart immediately when pincode changes
+                    clearCart()
+                  }
+                  
+                  // Check if the pincode is serviceable
+                  const serviceable = await isPincodeServiceable(foundPincode)
+                  
+                  // Save pincode regardless of serviceability
+                  updatePincode(foundPincode)
+                  setOpenPincodeDialog(false)
+                  
+                  if (serviceable) {
+                    // Reload the page to fetch new data based on updated pincode
+                    window.location.reload()
+                  } else {
+                    // Redirect to coming soon page if not serviceable
+                    router.push("/coming-soon")
+                  }
+                } catch (error) {
+                  console.error("Error checking pincode serviceability:", error)
+                  // On error, update pincode and reload anyway
+                  updatePincode(foundPincode)
+                  setOpenPincodeDialog(false)
+                  window.location.reload()
+                } finally {
+                  setIsChecking(false)
+                }
+              } else {
+                setAddress(formattedAddress)
+                alert("Could not detect pincode from your location. Please enter it manually.")
+              }
+            }
+          } catch (error) {
+            console.error("Error getting location:", error)
+            alert("Failed to get your location. Please enter pincode manually.")
+          } finally {
+            setIsLoadingAddress(false)
+            setUseCurrentLocation(false)
+          }
+        },
+        (error) => {
+          console.error("Error getting location:", error)
+          alert("Failed to access your location. Please check your browser permissions and try again.")
+          setIsLoadingAddress(false)
+          setUseCurrentLocation(false)
+        }
+      )
+    } else {
+      alert("Geolocation is not supported by this browser.")
+      setUseCurrentLocation(false)
+    }
   }
   
   // Handle pincode submission
@@ -71,11 +227,8 @@ export default function Header() {
       setIsChecking(true)
       
       try {
-        // Check if pincode is changing
-        if (pincode !== inputPincode) {
-          // Clear cart immediately when pincode changes
-          clearCart()
-        }
+        // No need to clear cart manually, the cart context will handle this
+        // when the pincode changes through localStorage events
         
         // Check if the pincode is serviceable
         const serviceable = await isPincodeServiceable(inputPincode)
@@ -85,18 +238,18 @@ export default function Header() {
         setOpenPincodeDialog(false)
         
         if (serviceable) {
-          // Reload the page to fetch new data based on updated pincode
-          window.location.reload()
+          // No need to reload the page, just refresh the router
+          router.refresh()
         } else {
           // Redirect to coming soon page if not serviceable
           router.push("/coming-soon")
         }
       } catch (error) {
         console.error("Error checking pincode serviceability:", error)
-        // On error, update pincode and reload anyway
+        // On error, update pincode but don't reload
         updatePincode(inputPincode)
         setOpenPincodeDialog(false)
-        window.location.reload()
+        router.refresh()
       } finally {
         setIsChecking(false)
       }
@@ -112,117 +265,8 @@ export default function Header() {
       <div className="md:hidden">
         <div className="flex items-center justify-between px-4 h-14">
           <Link href="/" className="flex items-center">
-            <Image src="/logo.webp" alt="Buzzat" width={90} height={36} className="h-9 w-auto" priority />
+            <Image src="/logo.webp" alt="Buzzat" width={90} height={36} className="h-12 w-auto" priority />
           </Link>
-          
-          <div className="flex items-center gap-2">
-            {loading ? (
-              <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
-            ) : user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-gray-700 p-1">
-                    <User size={20} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/account/profile">Profile</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/account/orders">Orders</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/account/addresses">Addresses</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
-                    <LogOut size={16} className="mr-2" />
-                    Sign out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-700 p-1"
-                onClick={() => setShowLoginModal(true)}
-                disabled={!isAuthInitialized}
-              >
-                <User size={20} />
-              </Button>
-            )}
-
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="relative p-1">
-                  <ShoppingCart size={20} />
-                  {cartCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                      {cartCount}
-                    </span>
-                  )}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[80vh] rounded-t-xl px-0">
-                <SheetTitle className="sr-only">Shopping Cart</SheetTitle>
-                <div className="flex justify-center mb-2">
-                  <div className="w-12 h-1.5 bg-gray-300 rounded-full mt-1"></div>
-                </div>
-                <div className="h-full flex flex-col px-4">
-                  <div className="flex justify-between items-center pb-3 border-b mb-2">
-                    <h2 className="text-xl font-bold">Your Cart</h2>
-                    <SheetTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
-                        ×
-                      </Button>
-                    </SheetTrigger>
-                  </div>
-                  {cartItems.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center">
-                      <ShoppingCart size={64} className="text-gray-300 mb-4" />
-                      <p className="text-gray-500">Your cart is empty</p>
-                      <Button className="mt-4 bg-green-500 hover:bg-green-600">Start Shopping</Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex-1 overflow-auto pb-4">
-                        {cartItems.map(item => (
-                          <CartItem
-                            key={item.id}
-                            id={item.id}
-                            name={item.name}
-                            price={item.price}
-                            unit={item.unit}
-                            image={item.image}
-                            quantity={item.quantity}
-                          />
-                        ))}
-                      </div>
-                      <div className="border-t pt-4 mt-auto">
-                        <div className="flex justify-between mb-2">
-                          <span>Subtotal</span>
-                          <span>₹{cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between mb-4">
-                          <span>Delivery Fee</span>
-                          <span>₹40.00</span>
-                        </div>
-                        <div className="flex justify-between font-bold mb-4">
-                          <span>Total</span>
-                          <span>₹{(cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) + 40).toFixed(2)}</span>
-                        </div>
-                        <Button className="w-full bg-green-500 hover:bg-green-600 mb-4">Proceed to Checkout</Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
         </div>
         
         {/* Work location selector and pincode for mobile */}
@@ -230,10 +274,14 @@ export default function Header() {
           <DialogTrigger asChild>
             <div className="flex items-center px-4 py-1 bg-gray-50 text-sm font-medium cursor-pointer">
               <div className="flex items-center">
-                {/* <span className="mr-1">Home</span> */}
+                <MapPin size={16} className="mr-1 text-gray-600" />
                 <span className="text-gray-600">
-                  
-                  Aliganj,Lucknow</span>
+                  {address ? (
+                    <span className="truncate max-w-[200px] inline-block">{address.split(',').slice(0, 2).join(',')}</span>
+                  ) : (
+                    "Select Location"
+                  )}
+                </span>
                 <ChevronDown size={16} className="ml-1 text-gray-500" />
               </div>
               <div className="ml-auto text-xs text-gray-500">
@@ -243,39 +291,56 @@ export default function Header() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Enter your delivery pincode</DialogTitle>
+              <DialogTitle>Enter your delivery location</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handlePincodeSubmit} className="space-y-4">
-              <DialogInput
-                type="text"
-                placeholder="Enter 6-digit pincode"
-                value={inputPincode}
-                onChange={(e) => setInputPincode(e.target.value)}
-                maxLength={6}
-                pattern="[0-9]*"
-                inputMode="numeric"
-              />
-              <Button
-                type="submit"
-                className="w-full bg-green-500 hover:bg-green-600"
-                disabled={inputPincode.length !== 6 || !/^\d+$/.test(inputPincode) || isChecking}
+            <div className="space-y-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full flex items-center justify-center gap-2"
+                onClick={getCurrentLocation}
+                disabled={useCurrentLocation || isLoadingAddress || isChecking}
               >
-                {isChecking ? "Checking..." : "Continue"}
+                <MapPin size={16} />
+                {isLoadingAddress ? "Getting location..." : isChecking ? "Checking serviceability..." : "Use current location"}
               </Button>
-            </form>
+              
+              {address && (
+                <div className="p-3 bg-gray-50 rounded-md">
+                  <p className="text-sm font-medium">Delivery Address</p>
+                  <p className="text-sm text-gray-600">{address}</p>
+                </div>
+              )}
+              
+              <form onSubmit={handlePincodeSubmit} className="space-y-4">
+                <div>
+                  <label htmlFor="pincode" className="text-sm font-medium block mb-1">Pincode</label>
+                  <DialogInput
+                    id="pincode"
+                    type="text"
+                    placeholder="Enter 6-digit pincode"
+                    value={inputPincode}
+                    onChange={(e) => setInputPincode(e.target.value)}
+                    maxLength={6}
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-green-500 hover:bg-green-600"
+                  disabled={inputPincode.length !== 6 || !/^\d+$/.test(inputPincode) || isChecking}
+                >
+                  {isChecking ? "Checking..." : "Continue"}
+                </Button>
+              </form>
+            </div>
           </DialogContent>
         </Dialog>
         
         {/* Search bar for mobile */}
         <div className="px-4 py-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-            <Input
-              type="search"
-              placeholder='Search "milk"'
-              className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 bg-gray-50"
-            />
-          </div>
+          <ProductSearch />
         </div>
       </div>
 
@@ -293,12 +358,7 @@ export default function Header() {
           </div>
 
           <div className="flex relative w-1/2 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-            <Input
-              type="search"
-              placeholder="Search for your needs..."
-              className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-            />
+            <ProductSearch />
           </div>
 
           <div className="flex items-center gap-2">
@@ -357,17 +417,9 @@ export default function Header() {
               </SheetTrigger>
               <SheetContent side="bottom" className="h-[80vh] rounded-t-xl px-0">
                 <SheetTitle className="sr-only">Shopping Cart</SheetTitle>
-                <div className="flex justify-center mb-2">
-                  <div className="w-12 h-1.5 bg-gray-300 rounded-full mt-1"></div>
-                </div>
                 <div className="h-full flex flex-col px-4">
                   <div className="flex justify-between items-center pb-3 border-b mb-2">
                     <h2 className="text-xl font-bold">Your Cart</h2>
-                    <SheetTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
-                        ×
-                      </Button>
-                    </SheetTrigger>
                   </div>
                   {cartItems.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center">
@@ -403,7 +455,20 @@ export default function Header() {
                           <span>Total</span>
                           <span>₹{(cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) + 40).toFixed(2)}</span>
                         </div>
-                        <Button className="w-full bg-green-500 hover:bg-green-600 mb-4">Proceed to Checkout</Button>
+                        <Button 
+                          className="w-full bg-green-500 hover:bg-green-600 mb-4"
+                          onClick={() => {
+                            if (!user) {
+                              // Set a flag to redirect to checkout after login
+                              localStorage.setItem("redirect_to_checkout", "true")
+                              setShowLoginModal(true)
+                            } else {
+                              router.push('/checkout')
+                            }
+                          }}
+                        >
+                          {user ? "Proceed to Checkout" : "Login to Checkout"}
+                        </Button>
                       </div>
                     </>
                   )}

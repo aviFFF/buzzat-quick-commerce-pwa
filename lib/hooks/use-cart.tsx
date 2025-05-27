@@ -29,55 +29,135 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [currentPincode, setCurrentPincode] = useState<string>("")
+  const [isInitialized, setIsInitialized] = useState(false)
 
   // Load cart from localStorage on mount
   useEffect(() => {
-    const savedCart = localStorage.getItem("cart")
+    const loadCart = () => {
+      // Get current pincode
+      const pincode = localStorage.getItem("pincode") || ""
+      setCurrentPincode(pincode)
+      
+      // Get cart for this pincode
+      const cartKey = `cart_${pincode}`
+      const savedCart = localStorage.getItem(cartKey)
+      
     if (savedCart) {
       try {
-        setCartItems(JSON.parse(savedCart))
+          const parsedCart = JSON.parse(savedCart)
+          setCartItems(parsedCart)
       } catch (error) {
-        console.error("Failed to parse cart from localStorage:", error)
+          console.error(`Failed to parse cart from localStorage (${cartKey}):`, error)
+          // If there's an error parsing, initialize with empty cart
+          setCartItems([])
+        }
+      } else {
+        // No cart for this pincode yet
+        setCartItems([])
       }
+      
+      setIsInitialized(true)
     }
     
-    // Store the initial pincode
-    const pincode = localStorage.getItem("pincode")
-    if (pincode) {
-      setCurrentPincode(pincode)
-    }
+    loadCart()
   }, [])
   
-  // Check for pincode changes
+  // Listen for pincode changes from other tabs/windows and custom events
   useEffect(() => {
-    const checkPincodeChange = () => {
-      const newPincode = localStorage.getItem("pincode")
-      if (newPincode && currentPincode && newPincode !== currentPincode) {
-        // Pincode has changed, clear cart
-        setCartItems([])
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "pincode" && e.newValue !== currentPincode) {
+        // Pincode changed in another tab/window
+        const newPincode = e.newValue || ""
         setCurrentPincode(newPincode)
+        
+        // Load cart for the new pincode
+        const cartKey = `cart_${newPincode}`
+        const savedCart = localStorage.getItem(cartKey)
+        
+        if (savedCart) {
+          try {
+            setCartItems(JSON.parse(savedCart))
+          } catch (error) {
+            console.error(`Failed to parse cart for new pincode:`, error)
+            setCartItems([])
+          }
+        } else {
+          setCartItems([])
+        }
       }
     }
     
-    // Set up event listener for storage changes
-    window.addEventListener("storage", checkPincodeChange)
+    // Handle custom pincodeChange event for browsers that don't support StorageEvent constructor
+    const handleCustomPincodeChange = (e: CustomEvent<{ newPincode: string; oldPincode: string }>) => {
+      const { newPincode } = e.detail;
+      if (newPincode !== currentPincode) {
+        setCurrentPincode(newPincode);
+        
+        // Load cart for the new pincode
+        const cartKey = `cart_${newPincode}`;
+        const savedCart = localStorage.getItem(cartKey);
+        
+        if (savedCart) {
+          try {
+            setCartItems(JSON.parse(savedCart));
+          } catch (error) {
+            console.error(`Failed to parse cart for new pincode:`, error);
+            setCartItems([]);
+          }
+        } else {
+          setCartItems([]);
+        }
+      }
+    };
     
-    // Run once on mount
-    checkPincodeChange()
-    
-    // Regular polling as a fallback (in case storage event doesn't fire)
-    const interval = setInterval(checkPincodeChange, 1000)
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("pincodeChange", handleCustomPincodeChange as EventListener);
     
     return () => {
-      window.removeEventListener("storage", checkPincodeChange)
-      clearInterval(interval)
-    }
-  }, [currentPincode])
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("pincodeChange", handleCustomPincodeChange as EventListener);
+    };
+  }, [currentPincode]);
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cartItems))
-  }, [cartItems])
+    // Only save after initialization to prevent overwriting with empty cart
+    if (isInitialized && currentPincode) {
+      const cartKey = `cart_${currentPincode}`
+      localStorage.setItem(cartKey, JSON.stringify(cartItems))
+    }
+  }, [cartItems, currentPincode, isInitialized])
+
+  // Monitor pincode changes within the same tab
+  useEffect(() => {
+    const checkPincodeChange = () => {
+      const storedPincode = localStorage.getItem("pincode") || ""
+      
+      // If pincode changed and we have a current pincode (not initial load)
+      if (currentPincode && storedPincode !== currentPincode) {
+        setCurrentPincode(storedPincode)
+        
+        // Load cart for the new pincode
+        const cartKey = `cart_${storedPincode}`
+        const savedCart = localStorage.getItem(cartKey)
+        
+        if (savedCart) {
+          try {
+            setCartItems(JSON.parse(savedCart))
+          } catch (error) {
+            console.error("Failed to parse cart for new pincode:", error)
+            setCartItems([])
+          }
+        } else {
+          setCartItems([])
+        }
+      }
+    }
+    
+    // Check periodically for pincode changes
+    const interval = setInterval(checkPincodeChange, 1000)
+    return () => clearInterval(interval)
+  }, [currentPincode])
 
   const cartCount = cartItems.reduce((count, item) => count + item.quantity, 0)
 
@@ -108,6 +188,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = () => {
     setCartItems([])
+    if (currentPincode) {
+      const cartKey = `cart_${currentPincode}`
+      localStorage.removeItem(cartKey)
+    }
   }
 
   return (

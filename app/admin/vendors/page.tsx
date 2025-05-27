@@ -45,6 +45,7 @@ interface Vendor {
   status: string
   productsCount: number
   joinedDate: string
+  deliveryMessage?: string
 }
 
 export default function VendorsPage() {
@@ -146,6 +147,7 @@ export default function VendorsPage() {
             status: data.status || 'pending',
             productsCount: data.productsCount || 0,
             joinedDate: data.joinedDate || new Date().toISOString(),
+            deliveryMessage: data.deliveryMessage || 'Delivery in 8 minutes',
           };
         });
       });
@@ -457,6 +459,7 @@ export default function VendorsPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Pincodes</TableHead>
+                    <TableHead>Delivery Message</TableHead>
                     <TableHead>Products</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
@@ -482,6 +485,7 @@ export default function VendorsPage() {
                           )}
                         </div>
                       </TableCell>
+                      <TableCell>{vendor.deliveryMessage || "Delivery in 8 minutes"}</TableCell>
                       <TableCell>{vendor.productsCount}</TableCell>
                       <TableCell>
                         <Badge

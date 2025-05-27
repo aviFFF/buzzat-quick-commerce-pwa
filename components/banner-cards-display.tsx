@@ -4,7 +4,11 @@ import { useEffect, useState } from "react"
 import BannerCard, { BannerCardProps } from "./banner-card"
 import { Skeleton } from "@/components/ui/skeleton"
 
-export default function BannerCardsDisplay() {
+interface BannerCardsDisplayProps {
+  position?: 'top' | 'middle' | 'bottom'
+}
+
+export default function BannerCardsDisplay({ position }: BannerCardsDisplayProps) {
   const [bannerCards, setBannerCards] = useState<BannerCardProps[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -50,16 +54,12 @@ export default function BannerCardsDisplay() {
   }, [])
 
   if (loading) {
-    return <CardsSkeleton />
+    return position ? <PositionSkeleton position={position} /> : <CardsSkeleton />
   }
 
-  const topCard = bannerCards.find(card => card.position === 'top')
-  const middleCard = bannerCards.find(card => card.position === 'middle')
-  const bottomCard = bannerCards.find(card => card.position === 'bottom')
-
+  // For desktop view, always show all banners
+  if (!position) {
   return (
-    <>
-      {/* Desktop View: All cards in flex row above categories */}
       <div className="hidden md:flex gap-4 my-6">
         {bannerCards.map(card => (
           <BannerCard 
@@ -71,33 +71,98 @@ export default function BannerCardsDisplay() {
           />
         ))}
       </div>
+    )
+  }
 
-      {/* Mobile View: Cards at different positions */}
+  // For mobile view, show only the banner at the specified position
+  const card = bannerCards.find(card => card.position === position)
+  
+  if (!card) return null
+
+  return (
+    <div className={`md:${position === 'top' ? 'hidden' : 'flex'} my-6`}>
+      {position === 'top' ? (
+        // For top position, visible on both mobile and desktop
+        <>
+          {/* Desktop: all banners */}
+          <div className="hidden md:flex gap-4">
+        {bannerCards.map(card => (
+          <BannerCard 
+            key={card.id}
+            title={card.title}
+            imageUrl={card.imageUrl}
+            link={card.link}
+            className="flex-1"
+          />
+        ))}
+      </div>
+
+          {/* Mobile: only top banner */}
       <div className="md:hidden">
-        {/* Top card (above categories) */}
-        {topCard && (
-          <div className="mb-6">
             <BannerCard
-              title={topCard.title}
-              imageUrl={topCard.imageUrl}
-              link={topCard.link}
+              title={card.title}
+              imageUrl={card.imageUrl}
+              link={card.link}
+            />
+          </div>
+        </>
+      ) : (
+        // For middle and bottom positions, only visible on mobile
+        <div className="md:hidden">
+          <BannerCard
+            title={card.title}
+            imageUrl={card.imageUrl}
+            link={card.link}
             />
           </div>
         )}
+    </div>
+  )
+}
+
+function PositionSkeleton({ position }: { position: string }) {
+  if (position === 'top') {
+    return (
+      <>
+        {/* Desktop skeleton - all banners */}
+        <div className="hidden md:flex gap-4 mb-6">
+          {Array(3).fill(0).map((_, i) => (
+            <Skeleton key={i} className="w-full aspect-[21/9] rounded-lg" />
+          ))}
       </div>
 
-      {/* Middle card placeholder - will be rendered in page.tsx */}
-      {/* Bottom card placeholder - will be rendered in page.tsx */}
-    </>
+        {/* Mobile skeleton - only top banner */}
+        <div className="md:hidden mb-6">
+          <Skeleton className="w-full aspect-[16/9] rounded-lg" />
+        </div>
+      </>
+    )
+  }
+  
+  // Middle and bottom skeletons - only on mobile
+  return (
+    <div className="md:hidden mb-6">
+      <Skeleton className="w-full aspect-[16/9] rounded-lg" />
+    </div>
   )
 }
 
 function CardsSkeleton() {
   return (
+    <>
+      {/* Desktop skeleton */}
     <div className="hidden md:flex gap-4 mb-6">
       {Array(3).fill(0).map((_, i) => (
         <Skeleton key={i} className="w-full aspect-[21/9] rounded-lg" />
       ))}
     </div>
+      
+      {/* Mobile skeleton */}
+      <div className="md:hidden space-y-6 mb-6">
+        {Array(3).fill(0).map((_, i) => (
+          <Skeleton key={i} className="w-full aspect-[16/9] rounded-lg" />
+        ))}
+      </div>
+    </>
   )
 } 

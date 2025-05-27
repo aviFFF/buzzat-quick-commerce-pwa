@@ -47,6 +47,7 @@ export interface Vendor {
   address: string
   pincodes: string[]
   status: "active" | "pending" | "blocked"
+  deliveryMessage?: string
   createdAt?: Timestamp
   updatedAt?: Timestamp
 }
