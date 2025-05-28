@@ -1,3 +1,6 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { 
   ShoppingBag, 
@@ -9,11 +12,47 @@ import {
   HelpCircle, 
   Info, 
   PhoneCall, 
-  Settings 
+  Settings,
+  Loader2
 } from "lucide-react"
 import Header from "@/components/header"
+import { getAllCategories } from "@/lib/firebase/firestore"
+
+// Define Category interface
+interface Category {
+  id: string;
+  name: string;
+  icon?: string;
+}
+
+// Function to convert category name to URL-friendly slug
+function createSlug(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+}
 
 export default function MenuPage() {
+  const [firstCategorySlug, setFirstCategorySlug] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  
+  useEffect(() => {
+    const fetchFirstCategory = async () => {
+      try {
+        const categories = await getAllCategories() as Category[];
+        if (categories && categories.length > 0) {
+          const firstCategory = categories[0];
+          const slug = `${createSlug(firstCategory.name)}-${firstCategory.id}`;
+          setFirstCategorySlug(slug);
+        }
+      } catch (error) {
+        console.error("Error fetching first category:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchFirstCategory();
+  }, []);
+  
   return (
     <main className="min-h-screen bg-gray-50">
       <Header />
@@ -26,11 +65,19 @@ export default function MenuPage() {
             icon={<Home className="text-emerald-600" size={20} />}
             label="Home"
           />
-          <MenuItem 
-            href="/category"
-            icon={<ShoppingBag className="text-emerald-600" size={20} />}
-            label="Shop by Category"
-          />
+          {isLoading ? (
+            <div className="flex items-center py-4 px-4">
+              <div className="mr-3"><ShoppingBag className="text-emerald-600" size={20} /></div>
+              <span className="font-medium">Shop by Category</span>
+              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+            </div>
+          ) : (
+            <MenuItem 
+              href={firstCategorySlug ? `/category/${firstCategorySlug}` : "/category"}
+              icon={<ShoppingBag className="text-emerald-600" size={20} />}
+              label="Shop by Category"
+            />
+          )}
           <MenuItem 
             href="/account/profile"
             icon={<User className="text-emerald-600" size={20} />}

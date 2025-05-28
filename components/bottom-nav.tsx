@@ -5,11 +5,12 @@ import { usePathname, useRouter } from "next/navigation"
 import { Home, ShoppingBag, ShoppingCart } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useCart } from "@/lib/hooks/use-cart"
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetClose } from "@/components/ui/sheet"
 import CartItem from "./cart-item"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/context/auth-context"
 import UserMenu from "./user-menu"
+import { getAllCategories } from "@/lib/firebase/firestore"
 
 // Define user pages where bottom navbar should appear
 const USER_PAGES = [
@@ -21,6 +22,18 @@ const USER_PAGES = [
   '/account/profile', // user profile page
 ]
 
+// Function to convert category name to URL-friendly slug
+function createSlug(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+}
+
+// Define Category interface
+interface Category {
+  id: string;
+  name: string;
+  icon?: string;
+}
+
 export default function BottomNav() {
   const pathname = usePathname()
   const router = useRouter()
@@ -29,6 +42,7 @@ export default function BottomNav() {
   const { cartItems, cartCount } = useCart()
   const [cartOpen, setCartOpen] = useState(false)
   const { user } = useAuth()
+  const [firstCategorySlug, setFirstCategorySlug] = useState<string | null>(null)
   
   // Use useEffect to handle client-side mounting and check screen size
   useEffect(() => {
@@ -44,6 +58,22 @@ export default function BottomNav() {
     
     // Add event listener for window resize
     window.addEventListener('resize', checkIsMobile)
+    
+    // Fetch first category
+    const fetchFirstCategory = async () => {
+      try {
+        const categories = await getAllCategories() as Category[];
+        if (categories && categories.length > 0) {
+          const firstCategory = categories[0];
+          const slug = `${createSlug(firstCategory.name)}-${firstCategory.id}`;
+          setFirstCategorySlug(slug);
+        }
+      } catch (error) {
+        console.error("Error fetching first category:", error);
+      }
+    };
+    
+    fetchFirstCategory();
     
     // Cleanup
     return () => window.removeEventListener('resize', checkIsMobile)
@@ -88,7 +118,7 @@ export default function BottomNav() {
         />
         
         <NavItem 
-          href="/category" 
+          href={firstCategorySlug ? `/category/${firstCategorySlug}` : "/category"} 
           icon={<ShoppingBag size={22} />} 
           label="Shop"
           isActive={pathname.startsWith("/category") || pathname.startsWith("/product")}
@@ -121,11 +151,9 @@ export default function BottomNav() {
             <div className="h-full flex flex-col px-4 pb-6">
               <div className="flex justify-between items-center pb-3 border-b mb-2">
                 <h2 className="text-xl font-bold">Your Cart</h2>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
-                    ×
-                  </Button>
-                </SheetTrigger>
+                <SheetClose className="h-8 w-8 p-0 flex items-center justify-center rounded-full border border-gray-200">
+                  <span className="text-xl">×</span>
+                </SheetClose>
               </div>
               {cartItems.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center">
@@ -161,13 +189,14 @@ export default function BottomNav() {
                       <span>Total</span>
                       <span>₹{(cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) + 40).toFixed(2)}</span>
                     </div>
-                    <Button 
-                      className="w-full bg-emerald-500 hover:bg-emerald-600 mb-4 z-50"
-                      onClick={handleProceedToCheckout}
-                      style={{ position: 'relative' }}
-                    >
-                      {user ? "Proceed to Checkout" : "Login to Checkout"}
-                    </Button>
+                    <div className="pb-20">
+                      <Button 
+                        className="w-full bg-emerald-500 hover:bg-emerald-600 fixed bottom-20 left-0 right-0 mx-4 z-50"
+                        onClick={handleProceedToCheckout}
+                      >
+                        {user ? "Proceed to Checkout" : "Login to Checkout"}
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}

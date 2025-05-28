@@ -6,7 +6,7 @@ import Image from "next/image"
 import { Search, ShoppingCart, User, LogOut, ChevronDown, Clock, MapPin, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetClose } from "@/components/ui/sheet"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,10 +29,21 @@ import {
 } from "@/components/ui/dialog"
 import { Input as DialogInput } from "@/components/ui/input"
 import { usePincode } from "@/lib/hooks/use-pincode"
-import { isPincodeServiceable } from "@/lib/firebase/firestore"
-import { useRouter } from "next/navigation"
+import { isPincodeServiceable, getAllCategories } from "@/lib/firebase/firestore"
+import { useRouter, usePathname } from "next/navigation"
 import CartItem from "./cart-item"
 import { ProductSearch } from "./product-search"
+
+interface Category {
+  id: string;
+  name: string;
+  icon?: string;
+}
+
+// Function to convert category name to URL-friendly slug
+function createSlug(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+}
 
 export default function Header() {
   const { cartItems, cartCount, clearCart } = useCart()
@@ -40,6 +51,11 @@ export default function Header() {
   const { isAuthInitialized, isLoading: firebaseLoading } = useFirebase()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const pathname = usePathname()
+  
+  // Add state for categories
+  const [categories, setCategories] = useState<Category[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true)
   
   // Pincode related state
   const { pincode, updatePincode, isLoading: pincodeLoading } = usePincode()
@@ -66,6 +82,21 @@ export default function Header() {
       // Fetch address for the pincode
       fetchAddressFromPincode(pincode)
     }
+    
+    // Fetch categories
+    const fetchCategories = async () => {
+      setIsLoadingCategories(true)
+      try {
+        const allCategories = await getAllCategories() as Category[];
+        setCategories(allCategories);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+    
+    fetchCategories();
   }, [pincode])
 
   const handleSignOut = async () => {
@@ -420,6 +451,9 @@ export default function Header() {
                 <div className="h-full flex flex-col px-4">
                   <div className="flex justify-between items-center pb-3 border-b mb-2">
                     <h2 className="text-xl font-bold">Your Cart</h2>
+                    <SheetClose className="h-8 w-8 p-0 flex items-center justify-center rounded-full border border-gray-200">
+                      <span className="text-xl">×</span>
+                    </SheetClose>
                   </div>
                   {cartItems.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center">
@@ -455,26 +489,59 @@ export default function Header() {
                           <span>Total</span>
                           <span>₹{(cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) + 40).toFixed(2)}</span>
                         </div>
-                        <Button 
-                          className="w-full bg-green-500 hover:bg-green-600 mb-4"
-                          onClick={() => {
-                            if (!user) {
-                              // Set a flag to redirect to checkout after login
-                              localStorage.setItem("redirect_to_checkout", "true")
-                              setShowLoginModal(true)
-                            } else {
-                              router.push('/checkout')
-                            }
-                          }}
-                        >
-                          {user ? "Proceed to Checkout" : "Login to Checkout"}
-                        </Button>
+                        <div className="pb-20">
+                          <Button 
+                            className="w-full bg-green-500 hover:bg-green-600 fixed bottom-4 left-0 right-0 mx-4 z-50"
+                            onClick={() => {
+                              if (!user) {
+                                // Set a flag to redirect to checkout after login
+                                localStorage.setItem("redirect_to_checkout", "true")
+                                setShowLoginModal(true)
+                              } else {
+                                router.push('/checkout')
+                              }
+                            }}
+                          >
+                            {user ? "Proceed to Checkout" : "Login to Checkout"}
+                          </Button>
+                        </div>
                       </div>
                     </>
                   )}
                 </div>
               </SheetContent>
             </Sheet>
+          </div>
+        </div>
+        
+        {/* Desktop Navigation with Categories */}
+        <div className="bg-gray-50 border-b border-gray-200">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center overflow-x-auto hide-scrollbar">
+              {isLoadingCategories ? (
+                <div className="py-3 px-4">Loading categories...</div>
+              ) : categories.length > 0 ? (
+                categories.map((category) => {
+                  const categorySlug = `${createSlug(category.name)}-${category.id}`;
+                  return (
+                    <Link
+                      key={category.id}
+                      href={`/category/${categorySlug}`}
+                      className={`py-3 px-4 whitespace-nowrap text-sm font-medium transition-colors ${
+                        pathname.includes(`/category/${categorySlug}`) || 
+                        pathname === `/category/${category.id}`
+                          ? 'text-emerald-600 border-b-2 border-emerald-600' 
+                          : 'text-gray-600 hover:text-emerald-600'
+                      }`}
+                    >
+                      {category.name}
+                    </Link>
+                  );
+                })
+              ) : (
+                <div className="py-3 px-4 text-gray-500">No categories found</div>
+              )}
+            </div>
           </div>
         </div>
       </div>

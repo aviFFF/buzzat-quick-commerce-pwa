@@ -1,6 +1,6 @@
 "use client"
 
-import { getAuth, signInWithPhoneNumber as firebaseSignInWithPhoneNumber, PhoneAuthProvider, signInWithCredential, RecaptchaVerifier, signOut as firebaseSignOut } from "firebase/auth"
+import { getAuth, signInWithPhoneNumber as firebaseSignInWithPhoneNumber, PhoneAuthProvider, signInWithCredential, RecaptchaVerifier, signOut as firebaseSignOut, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
 import { initializeFirebaseApp } from "./firebase-client"
 import { isAuthInitialized } from "./firebase-client"
 
@@ -41,6 +41,56 @@ export const initRecaptchaVerifier = async (containerId: string) => {
   } catch (error) {
     console.error("Error initializing RecaptchaVerifier:", error)
     throw error
+  }
+}
+
+// Sign in with Google
+export async function signInWithGoogle() {
+  try {
+    if (!auth) {
+      console.error("Auth is not initialized")
+      return { success: false, error: new Error("Auth is not initialized") }
+    }
+
+    // DEVELOPMENT WORKAROUND: Check if we're in development mode
+    if (process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_USE_AUTH_EMULATOR === "true") {
+      console.log("Using development auth workaround - bypassing Firebase Google auth")
+      
+      // Create a mock user
+      const mockUser = {
+        uid: "dev-google-user-" + Date.now(),
+        phoneNumber: null,
+        displayName: "Dev User",
+        email: "dev.user@example.com",
+        photoURL: "https://via.placeholder.com/150",
+        isAnonymous: false,
+        metadata: {
+          creationTime: new Date().toISOString(),
+          lastSignInTime: new Date().toISOString()
+        }
+      }
+      
+      // Store the mock user in localStorage to simulate being signed in
+      localStorage.setItem("dev-auth-user", JSON.stringify(mockUser))
+      
+      // Trigger a storage event to notify other tabs/components
+      window.dispatchEvent(new Event("storage"))
+      
+      return { success: true, user: mockUser }
+    }
+
+    // PRODUCTION: Use actual Firebase authentication
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
+    
+    const result = await signInWithPopup(auth, provider);
+    console.log("User successfully authenticated with Google")
+    return { success: true, user: result.user }
+  } catch (error) {
+    console.error("Error signing in with Google:", error)
+    return { success: false, error }
   }
 }
 

@@ -1,11 +1,10 @@
 import { Suspense } from "react"
 import Header from "@/components/header"
-import CategoryGrid from "@/components/category-grid"
 import { Skeleton } from "@/components/ui/skeleton"
 import DynamicCategorySlider from "@/components/dynamic-category-slider"
 import CheckPincodeRedirect from "@/components/check-pincode-redirect"
 import BannerCardsDisplay from "@/components/banner-cards-display"
-import DeliveryBanner from "@/components/delivery-banner"
+import MobileCategoryGrid from "@/components/mobile-category-grid"
 
 // Define categories to be displayed on the homepage
 const featuredCategories = [
@@ -31,25 +30,26 @@ export default function Home() {
         {/* Check if pincode is serviceable and redirect if not */}
         <CheckPincodeRedirect />
         
-        {/* Scrolling Delivery Banner */}
-        <DeliveryBanner />
-
-        {/* Desktop banners and first mobile banner (above categories) */}
-        <Suspense fallback={<BannerSkeleton />}>
-          <BannerCardsDisplay position="top" />
-        </Suspense>
-
-        {/* Categories grid with rounded icons */}
-        <div className="my-6">
-          <Suspense fallback={<CategorySkeleton />}>
-            <CategoryGrid />
+        {/* Top banners */}
+        <div className="my-4">
+          <Suspense fallback={<BannerSkeleton />}>
+            <BannerCardsDisplay position="top" />
           </Suspense>
         </div>
 
-        {/* Second mobile banner (below categories) */}
-        <Suspense fallback={<div className="md:hidden my-6"><Skeleton className="w-full h-32 rounded-lg" /></div>}>
-          <BannerCardsDisplay position="middle" />
-        </Suspense>
+        {/* Mobile Categories Grid */}
+        <div className="my-6">
+          <Suspense fallback={<CategorySkeleton />}>
+            <MobileCategoryGrid />
+          </Suspense>
+        </div>
+
+        {/* Middle banners - where categories grid used to be */}
+        <div className="my-6">
+          <Suspense fallback={<BannerSkeleton />}>
+            <BannerCardsDisplay position="middle" />
+          </Suspense>
+        </div>
 
         {/* Dynamic Category Slider that shows only categories with available products */}
         <div className="my-8">
@@ -58,10 +58,12 @@ export default function Home() {
           </Suspense>
         </div>
         
-        {/* Third mobile banner (above footer) */}
-        <Suspense fallback={<div className="md:hidden my-6"><Skeleton className="w-full h-32 rounded-lg" /></div>}>
-          <BannerCardsDisplay position="bottom" />
-        </Suspense>
+        {/* Bottom banners */}
+        <div className="my-6">
+          <Suspense fallback={<BannerSkeleton />}>
+            <BannerCardsDisplay position="bottom" />
+          </Suspense>
+        </div>
       </div>
     </main>
   )
@@ -73,12 +75,16 @@ function BannerSkeleton() {
 
 function CategorySkeleton() {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4">
-      {Array(6)
-        .fill(0)
-        .map((_, i) => (
-          <Skeleton key={i} className="aspect-square rounded-lg" />
+    <div className="md:hidden">
+      <Skeleton className="h-6 w-40 mb-3" />
+      <div className="grid grid-cols-3 gap-3">
+        {Array(6).fill(0).map((_, i) => (
+          <div key={i} className="flex flex-col items-center">
+            <Skeleton className="w-16 h-16 rounded-full mb-2" />
+            <Skeleton className="h-3 w-16" />
+          </div>
         ))}
+      </div>
     </div>
   )
 }

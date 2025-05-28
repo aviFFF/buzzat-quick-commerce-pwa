@@ -54,115 +54,113 @@ export default function BannerCardsDisplay({ position }: BannerCardsDisplayProps
   }, [])
 
   if (loading) {
-    return position ? <PositionSkeleton position={position} /> : <CardsSkeleton />
+    return <BannerSkeleton position={position} />
   }
 
-  // For desktop view, always show all banners
-  if (!position) {
-  return (
-      <div className="hidden md:flex gap-4 my-6">
-        {bannerCards.map(card => (
-          <BannerCard 
-            key={card.id}
-            title={card.title}
-            imageUrl={card.imageUrl}
-            link={card.link}
-            className="flex-1"
-          />
-        ))}
-      </div>
-    )
+  // Filter banners by position
+  const filteredBanners = position 
+    ? bannerCards.filter(card => card.position === position)
+    : bannerCards;
+
+  if (filteredBanners.length === 0) {
+    return null;
   }
 
-  // For mobile view, show only the banner at the specified position
-  const card = bannerCards.find(card => card.position === position)
-  
-  if (!card) return null
-
   return (
-    <div className={`md:${position === 'top' ? 'hidden' : 'flex'} my-6`}>
-      {position === 'top' ? (
-        // For top position, visible on both mobile and desktop
+    <div className="my-4">
+      {/* For top position - show all banners in desktop, single banner in mobile */}
+      {position === 'top' && (
         <>
-          {/* Desktop: all banners */}
+          {/* Desktop view - show all banners in a row */}
           <div className="hidden md:flex gap-4">
-        {bannerCards.map(card => (
-          <BannerCard 
-            key={card.id}
-            title={card.title}
-            imageUrl={card.imageUrl}
-            link={card.link}
-            className="flex-1"
-          />
-        ))}
-      </div>
-
-          {/* Mobile: only top banner */}
-      <div className="md:hidden">
-            <BannerCard
+            {bannerCards.map(card => (
+              <BannerCard 
+                key={card.id}
+                title={card.title}
+                imageUrl={card.imageUrl}
+                link={card.link}
+                className="flex-1"
+              />
+            ))}
+          </div>
+          
+          {/* Mobile view - show only top banner */}
+          <div className="md:hidden">
+            {filteredBanners.map(card => (
+              <BannerCard 
+                key={card.id}
+                title={card.title}
+                imageUrl={card.imageUrl}
+                link={card.link}
+              />
+            ))}
+          </div>
+        </>
+      )}
+      
+      {/* For middle position - visible only on mobile */}
+      {position === 'middle' && (
+        <div className="md:hidden w-full">
+          {filteredBanners.map(card => (
+            <BannerCard 
+              key={card.id}
               title={card.title}
               imageUrl={card.imageUrl}
               link={card.link}
             />
-          </div>
-        </>
-      ) : (
-        // For middle and bottom positions, only visible on mobile
-        <div className="md:hidden">
-          <BannerCard
-            title={card.title}
-            imageUrl={card.imageUrl}
-            link={card.link}
+          ))}
+        </div>
+      )}
+      
+      {/* For bottom position - visible on both mobile and desktop */}
+      {position === 'bottom' && (
+        <div className="w-full">
+          {filteredBanners.map(card => (
+            <BannerCard 
+              key={card.id}
+              title={card.title}
+              imageUrl={card.imageUrl}
+              link={card.link}
             />
-          </div>
-        )}
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-function PositionSkeleton({ position }: { position: string }) {
+function BannerSkeleton({ position }: { position?: string }) {
   if (position === 'top') {
     return (
       <>
-        {/* Desktop skeleton - all banners */}
-        <div className="hidden md:flex gap-4 mb-6">
+        {/* Desktop skeleton - all banners in a row */}
+        <div className="hidden md:flex gap-4 my-4">
           {Array(3).fill(0).map((_, i) => (
             <Skeleton key={i} className="w-full aspect-[21/9] rounded-lg" />
           ))}
-      </div>
+        </div>
 
         {/* Mobile skeleton - only top banner */}
-        <div className="md:hidden mb-6">
+        <div className="md:hidden my-4">
           <Skeleton className="w-full aspect-[16/9] rounded-lg" />
         </div>
       </>
     )
   }
   
-  // Middle and bottom skeletons - only on mobile
+  // Middle skeleton - visible only on mobile
+  if (position === 'middle') {
+    return (
+      <div className="md:hidden my-4">
+        <Skeleton className="w-full aspect-[16/9] rounded-lg" />
+      </div>
+    )
+  }
+  
+  // Bottom skeleton - visible on both mobile and desktop
   return (
-    <div className="md:hidden mb-6">
+    <div className="my-4">
       <Skeleton className="w-full aspect-[16/9] rounded-lg" />
     </div>
-  )
-}
-
-function CardsSkeleton() {
-  return (
-    <>
-      {/* Desktop skeleton */}
-    <div className="hidden md:flex gap-4 mb-6">
-      {Array(3).fill(0).map((_, i) => (
-        <Skeleton key={i} className="w-full aspect-[21/9] rounded-lg" />
-      ))}
-    </div>
-      
-      {/* Mobile skeleton */}
-      <div className="md:hidden space-y-6 mb-6">
-        {Array(3).fill(0).map((_, i) => (
-          <Skeleton key={i} className="w-full aspect-[16/9] rounded-lg" />
-        ))}
-      </div>
-    </>
   )
 } 
