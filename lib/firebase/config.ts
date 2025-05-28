@@ -5,19 +5,21 @@ import { getStorage } from "firebase/storage"
 
 // Check for environment variables and provide fallbacks for development
 const getEnvOrFallback = (key: string, fallback: string = "") => {
-  const value = process.env[key]
-  if (!value && process.env.NODE_ENV === "development") {
-    console.warn(`Missing environment variable: ${key}, using fallback value`)
-    
+  // For client-side code, we need to access NEXT_PUBLIC_ variables
+  const value = typeof window !== 'undefined' 
+    ? (window as any).__ENV__?.[key] || process.env[key]
+    : process.env[key]
+  
+  if (!value) {
     // Default development fallback values for Firebase config
     const devFallbacks: Record<string, string> = {
-      NEXT_PUBLIC_FIREBASE_API_KEY: "test-api-key-for-development",
-      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "test-project.firebaseapp.com",
-      NEXT_PUBLIC_FIREBASE_PROJECT_ID: "test-project",
-      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "test-project.appspot.com",
-      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "123456789",
-      NEXT_PUBLIC_FIREBASE_APP_ID: "1:123456789:web:abcdefghijklmnop",
-      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-ABCDEFGHIJ",
+      NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyAKg3CZIAW14Il0n1M6D0DcnUQw31e_4l0",
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "buzzat-del-app.firebaseapp.com",
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: "buzzat-del-app",
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "buzzat-del-app.appspot.com",
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "223604858508",
+      NEXT_PUBLIC_FIREBASE_APP_ID: "1:223604858508:web:f2e72a2344dd44d61ba5a9",
+      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-R6BG1Q00R6",
     }
     
     return devFallbacks[key] || fallback
@@ -45,12 +47,9 @@ const isConfigValid = () => {
 }
 
 // Print configuration status for debugging
-if (process.env.NODE_ENV === 'development') {
-  if (isConfigValid()) {
-    console.log("Firebase configuration is valid (using " + 
-      (process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? "real" : "fallback") + 
-      " credentials)");
-  } else {
+if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+  console.log("Firebase config validation:", isConfigValid() ? "Valid" : "Invalid")
+  if (!isConfigValid()) {
     console.error(
       "Firebase configuration is invalid. Please check your environment variables or .env.local file. " +
       "You need to set NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, " +
@@ -71,9 +70,14 @@ try {
     auth = getAuth(app)
     db = getFirestore(app)
     storage = getStorage(app)
-    console.log("Firebase initialized successfully")
+    
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.log("Firebase initialized successfully")
+    }
   } else {
-    console.warn("Firebase not initialized due to invalid configuration. Test account will work in development mode.")
+    if (typeof window !== 'undefined') {
+      console.warn("Firebase not initialized due to invalid configuration. Test account will work in development mode.")
+    }
     // Create dummy objects to prevent runtime errors
     app = null
     auth = { currentUser: null }
@@ -81,7 +85,9 @@ try {
     storage = {}
   }
 } catch (error) {
-  console.error("Error initializing Firebase:", error)
+  if (typeof window !== 'undefined') {
+    console.error("Error initializing Firebase:", error)
+  }
   // Create dummy objects to prevent runtime errors
   app = null
   auth = { currentUser: null }

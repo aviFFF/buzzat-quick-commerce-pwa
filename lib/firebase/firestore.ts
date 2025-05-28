@@ -81,7 +81,6 @@ export interface Order {
 // Products
 export const getProductsByPincode = async (pincode: string) => {
   try {
-    console.log(`Fetching products for pincode: ${pincode}`);
     const q = query(
       collection(db, "products"),
       where("pincodes", "array-contains", pincode),
@@ -93,12 +92,6 @@ export const getProductsByPincode = async (pincode: string) => {
       ...doc.data(),
     })) as Product[]
     
-    console.log(`Found ${products.length} products for pincode ${pincode}`);
-    if (products.length > 0) {
-      console.log(`Sample product categories: ${products.slice(0, 3).map(p => p.category).join(', ')}`);
-      console.log(`Sample product: ${JSON.stringify(products[0], null, 2)}`);
-    }
-    
     return products;
   } catch (error) {
     console.error("Error getting products by pincode:", error)
@@ -109,7 +102,6 @@ export const getProductsByPincode = async (pincode: string) => {
 // Check if a pincode is serviceable (has any products available)
 export const isPincodeServiceable = async (pincode: string): Promise<boolean> => {
   try {
-    console.log(`Checking if pincode ${pincode} is serviceable`);
     const q = query(
       collection(db, "products"),
       where("pincodes", "array-contains", pincode),
@@ -119,7 +111,6 @@ export const isPincodeServiceable = async (pincode: string): Promise<boolean> =>
     )
     const querySnapshot = await getDocs(q)
     const isServiceable = !querySnapshot.empty
-    console.log(`Pincode ${pincode} serviceable: ${isServiceable}`);
     return isServiceable;
   } catch (error) {
     console.error("Error checking pincode serviceability:", error)
@@ -131,7 +122,6 @@ export const isPincodeServiceable = async (pincode: string): Promise<boolean> =>
 // Get all unique categories that have products for a specific pincode
 export const getCategoriesByPincode = async (pincode: string) => {
   try {
-    console.log(`Fetching categories for pincode: ${pincode}`);
     const products = await getProductsByPincode(pincode);
     
     // Extract unique categories
@@ -143,7 +133,6 @@ export const getCategoriesByPincode = async (pincode: string) => {
     });
     
     const categories = Array.from(categorySet);
-    console.log(`Found ${categories.length} unique categories for pincode ${pincode}: ${categories.join(', ')}`);
     
     return categories;
   } catch (error) {

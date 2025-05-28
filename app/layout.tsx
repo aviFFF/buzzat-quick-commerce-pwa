@@ -6,6 +6,8 @@ import { Providers } from "./providers"
 import { Toaster } from "@/components/ui/sonner"
 import BottomNav from "@/components/bottom-nav"
 import Footer from "@/components/footer"
+// Import environment variables setup
+import "@/lib/env"
 
 // Remove Google font dependency
 const fontClass = "font-sans"

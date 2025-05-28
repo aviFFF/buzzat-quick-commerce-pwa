@@ -17,10 +17,8 @@ export default function DeliveryBanner() {
       try {
         // Get the selected pincode from localStorage using the correct key
         const selectedPincode = localStorage.getItem('pincode')
-        console.log("Selected pincode:", selectedPincode)
         
         if (!selectedPincode) {
-          console.log("No pincode selected")
           setIsLoading(false)
           return
         }
@@ -47,7 +45,6 @@ export default function DeliveryBanner() {
         const querySnapshot = await getDocs(activeVendorsQuery)
         
         if (querySnapshot.empty) {
-          console.log("No active vendors found")
           setIsLoading(false)
           return
         }
@@ -58,20 +55,15 @@ export default function DeliveryBanner() {
           const vendorData = vendorDoc.data()
           const pincodes = vendorData.pincodes || []
           
-          console.log(`Vendor ${vendorData.name} pincodes:`, pincodes)
-          
           if (pincodes.includes(selectedPincode)) {
-            console.log(`Found vendor ${vendorData.name} serving pincode ${selectedPincode}`)
             foundVendor = vendorData
             break
           }
         }
         
         if (foundVendor && foundVendor.deliveryMessage) {
-          console.log("Setting delivery message:", foundVendor.deliveryMessage)
           setDeliveryMessage(foundVendor.deliveryMessage)
         } else {
-          console.log("No vendor found for pincode or no delivery message available")
         }
       } catch (error) {
         console.error("Error fetching delivery message:", error)

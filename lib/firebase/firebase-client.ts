@@ -29,7 +29,7 @@ let storage: FirebaseStorage | null = null
 const getEnvOrFallback = (key: string, fallback: string = "") => {
   const value = process.env[key]
   if (!value && process.env.NODE_ENV === "development") {
-    console.warn(`Missing environment variable: ${key}, using fallback value`)
+    // Removed console.warn to reduce console noise
     
     // Default development fallback values for Firebase config
     const devFallbacks: Record<string, string> = {
