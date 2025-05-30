@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { db } from "@/lib/firebase/config"
-import { collection, query, where, onSnapshot, orderBy, Timestamp } from "firebase/firestore"
-import { useVendor } from "@/lib/context/vendor-provider"
+import { collection, query, onSnapshot, orderBy, Timestamp } from "firebase/firestore"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -72,9 +71,8 @@ interface Order {
   deliveryPersonId?: string
 }
 
-export default function VendorOrders() {
+export default function AdminOrders() {
   const router = useRouter()
-  const { vendor } = useVendor()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<string>("all")
@@ -82,11 +80,9 @@ export default function VendorOrders() {
   const [newOrdersCount, setNewOrdersCount] = useState(0)
 
   useEffect(() => {
-    if (!vendor || !vendor.pincodes || vendor.pincodes.length === 0) return
-
     setLoading(true)
     
-    // Get orders that match the vendor's pincodes
+    // Get all orders
     const ordersQuery = query(
       collection(db, "orders"),
       orderBy("createdAt", "desc")
@@ -96,20 +92,13 @@ export default function VendorOrders() {
     const unsubscribe = onSnapshot(
       ordersQuery,
       (snapshot) => {
-        // Filter orders client-side based on pincode
-        const ordersData = snapshot.docs
-          .map(doc => {
-            const data = doc.data() as Order;
-            return {
-              id: doc.id,
-              ...data
-            };
-          })
-          .filter(order => {
-            // Check if order's pincode matches any of the vendor's pincodes
-            const orderPincode = order.address?.pincode;
-            return vendor.pincodes.includes(orderPincode);
-          });
+        const ordersData = snapshot.docs.map(doc => {
+          const data = doc.data() as Order;
+          return {
+            id: doc.id,
+            ...data
+          };
+        });
 
         // Check for new orders in the last 5 minutes
         const fiveMinutesAgo = new Date();
@@ -157,26 +146,22 @@ export default function VendorOrders() {
     );
 
     return () => unsubscribe();
-  }, [vendor, toast, newOrdersCount]);
+  }, [toast, newOrdersCount]);
 
   const handleOrderClick = (orderId: string) => {
-    router.push(`/vendor/orders/${orderId}`)
+    router.push(`/admin/orders/${orderId}`)
   }
 
   const filteredOrders = filterStatus === "all"
     ? orders
     : orders.filter(order => order.orderStatus === filterStatus)
 
-  if (!vendor) {
-    return <div>Loading...</div>
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Orders</h1>
-          <p className="text-gray-500">Manage orders for your delivery areas</p>
+          <h1 className="text-3xl font-bold">All Orders</h1>
+          <p className="text-gray-500">View and manage all customer orders</p>
         </div>
         <div className="flex items-center gap-2">
           {newOrdersCount > 0 && (
@@ -202,11 +187,8 @@ export default function VendorOrders() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle>Order List</CardTitle>
-          <div className="text-sm text-muted-foreground">
-            Showing orders for pincodes: {vendor.pincodes.join(', ')}
-          </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
@@ -225,6 +207,7 @@ export default function VendorOrders() {
                     <TableHead>Order #</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Customer</TableHead>
+                    <TableHead>Pincode</TableHead>
                     <TableHead>Items</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Status</TableHead>
@@ -247,6 +230,7 @@ export default function VendorOrders() {
                         <TableCell className="font-medium">{order.id.slice(0, 8).toUpperCase()}</TableCell>
                         <TableCell>{formattedDate}</TableCell>
                         <TableCell>{order.address?.name || '-'}</TableCell>
+                        <TableCell>{order.address?.pincode || '-'}</TableCell>
                         <TableCell>{order.items?.length || 0}</TableCell>
                         <TableCell>₹{order.totalAmount?.toFixed(2) || '0.00'}</TableCell>
                         <TableCell>

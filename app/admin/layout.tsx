@@ -5,11 +5,12 @@ import type React from "react"
 import type { ReactNode } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
-import { BarChart3, Home, Package, Settings, ShoppingBag, Users, LogOut, Layers, Image } from "lucide-react"
+import { BarChart3, Home, Package, Settings, ShoppingBag, Users, LogOut, Layers, Image, BellRing } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAuth } from "firebase/auth"
 import AdminAuthCheck from "@/components/admin/admin-auth-check"
 import Cookies from "js-cookie"
+import Head from "next/head"
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
@@ -29,11 +30,31 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   // Don't show admin layout on login page
   if (isLoginPage) {
-    return <>{children}</>
+    return (
+      <>
+        <Head>
+          <link rel="manifest" href="/admin-manifest.json" />
+          <meta name="theme-color" content="#3b82f6" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+          <meta name="apple-mobile-web-app-title" content="QC Admin" />
+          <link rel="apple-touch-icon" href="/icons/admin-icon-192x192.png" />
+        </Head>
+        {children}
+      </>
+    )
   }
 
   return (
     <AdminAuthCheck>
+      <Head>
+        <link rel="manifest" href="/admin-manifest.json" />
+        <meta name="theme-color" content="#3b82f6" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="QC Admin" />
+        <link rel="apple-touch-icon" href="/icons/admin-icon-192x192.png" />
+      </Head>
       <div className="min-h-screen flex">
         <aside className="w-64 bg-gray-900 text-white p-4 hidden md:block">
           <div className="mb-8">
@@ -87,10 +108,18 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <h1 className="text-lg font-medium">Admin Dashboard</h1>
             </div>
 
-            <div className="md:hidden">
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut size={18} />
-              </Button>
+            <div className="flex items-center gap-4">
+              <Link href="/admin/orders" className="relative">
+                <BellRing size={20} />
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                  0
+                </span>
+              </Link>
+              <div className="md:hidden">
+                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                  <LogOut size={18} />
+                </Button>
+              </div>
             </div>
           </header>
 

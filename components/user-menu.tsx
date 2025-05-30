@@ -7,7 +7,11 @@ import { useAuth } from "@/lib/context/auth-context"
 import { LoginModal } from "./auth/login-modal"
 import { useState, useEffect } from "react"
 
-export default function UserMenu() {
+interface UserMenuProps {
+  onNavigate?: () => void;
+}
+
+export default function UserMenu({ onNavigate }: UserMenuProps) {
   const { user, signOut } = useAuth()
   const [showLoginModal, setShowLoginModal] = useState(false)
 
@@ -33,6 +37,8 @@ export default function UserMenu() {
             localStorage.removeItem("redirect_to_checkout")
             // Ensure login modal appears when clicking the user icon
             setShowLoginModal(true)
+            // Call onNavigate if provided
+            if (onNavigate) onNavigate();
           }}
           className="flex flex-col items-center justify-center w-full py-1 text-gray-500"
         >
@@ -66,19 +72,35 @@ export default function UserMenu() {
           
           <div className="flex-1 overflow-auto">
             <nav className="space-y-1">
-              <Link href="/account/profile" className="flex items-center p-3 rounded-md hover:bg-gray-100">
+              <Link 
+                href="/account/profile" 
+                className="flex items-center p-3 rounded-md hover:bg-gray-100"
+                onClick={onNavigate}
+              >
                 <User size={20} className="mr-3 text-emerald-600" />
                 <span>Profile</span>
               </Link>
-              <Link href="/account/orders" className="flex items-center p-3 rounded-md hover:bg-gray-100">
+              <Link 
+                href="/account/orders" 
+                className="flex items-center p-3 rounded-md hover:bg-gray-100"
+                onClick={onNavigate}
+              >
                 <Clock size={20} className="mr-3 text-emerald-600" />
                 <span>My Orders</span>
               </Link>
-              <Link href="/account/addresses" className="flex items-center p-3 rounded-md hover:bg-gray-100">
+              <Link 
+                href="/account/addresses" 
+                className="flex items-center p-3 rounded-md hover:bg-gray-100"
+                onClick={onNavigate}
+              >
                 <MapPin size={20} className="mr-3 text-emerald-600" />
                 <span>My Addresses</span>
               </Link>
-              <Link href="/wishlist" className="flex items-center p-3 rounded-md hover:bg-gray-100">
+              <Link 
+                href="/wishlist" 
+                className="flex items-center p-3 rounded-md hover:bg-gray-100"
+                onClick={onNavigate}
+              >
                 <Heart size={20} className="mr-3 text-emerald-600" />
                 <span>My Wishlist</span>
               </Link>
@@ -89,6 +111,9 @@ export default function UserMenu() {
             <button 
               onClick={async () => {
                 try {
+                  // Call onNavigate if provided
+                  if (onNavigate) onNavigate();
+                  
                   const result = await signOut();
                   if (result.success) {
                     // Clear any checkout redirects

@@ -6,6 +6,7 @@ import { Providers } from "./providers"
 import { Toaster } from "@/components/ui/sonner"
 import BottomNav from "@/components/bottom-nav"
 import Footer from "@/components/footer"
+import Script from "next/script"
 // Import environment variables setup
 import "@/lib/env"
 
@@ -48,6 +49,7 @@ export default function RootLayout({
           </Providers>
           <Toaster />
         </ThemeProvider>
+        <Script src="/service-worker-register.js" strategy="lazyOnload" />
       </body>
     </html>
   )

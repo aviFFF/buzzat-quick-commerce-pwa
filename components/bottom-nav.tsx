@@ -108,13 +108,14 @@ export default function BottomNav() {
   }
   
   return (
-    <div className="mobile-bottom-nav hidden sm:hidden">
+    <div className="mobile-bottom-nav hidden sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-20">
       <div className="flex justify-around items-center h-16 w-full">
         <NavItem 
           href="/" 
           icon={<Home size={22} />} 
           label="Home"
           isActive={pathname === "/"}
+          onClick={() => cartOpen && setCartOpen(false)}
         />
         
         <NavItem 
@@ -122,6 +123,7 @@ export default function BottomNav() {
           icon={<ShoppingBag size={22} />} 
           label="Shop"
           isActive={pathname.startsWith("/category") || pathname.startsWith("/product")}
+          onClick={() => cartOpen && setCartOpen(false)}
         />
         
         <Sheet open={cartOpen} onOpenChange={setCartOpen}>
@@ -151,7 +153,7 @@ export default function BottomNav() {
             <div className="h-full flex flex-col px-4 pb-6">
               <div className="flex justify-between items-center pb-3 border-b mb-2">
                 <h2 className="text-xl font-bold">Your Cart</h2>
-                <SheetClose className="h-8 w-8 p-0 flex items-center justify-center rounded-full border border-gray-200">
+                <SheetClose className="h-8 w-8 p-0 flex items-center justify-center rounded-full border border-gray-200 md:block hidden">
                   <span className="text-xl">×</span>
                 </SheetClose>
               </div>
@@ -163,7 +165,7 @@ export default function BottomNav() {
                 </div>
               ) : (
                 <>
-                  <div className="flex-1 overflow-auto pb-4">
+                  <div className="flex-1 overflow-y-auto pb-4 max-h-[50vh]">
                     {cartItems.map(item => (
                       <CartItem
                         key={item.id}
@@ -176,7 +178,7 @@ export default function BottomNav() {
                       />
                     ))}
                   </div>
-                  <div className="border-t pt-4 mt-auto">
+                  <div className="border-t pt-4 mt-auto sticky bottom-0 bg-white">
                     <div className="flex justify-between mb-2">
                       <span>Subtotal</span>
                       <span>₹{cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}</span>
@@ -191,7 +193,7 @@ export default function BottomNav() {
                     </div>
                     <div className="pb-20">
                       <Button 
-                        className="w-full bg-emerald-500 hover:bg-emerald-600 fixed bottom-20 left-0 right-0 mx-4 z-50"
+                        className="w-full bg-emerald-500 hover:bg-emerald-600 fixed bottom-20 left-0 right-0 mx-4 z-10"
                         onClick={handleProceedToCheckout}
                       >
                         {user ? "Proceed to Checkout" : "Login to Checkout"}
@@ -204,7 +206,7 @@ export default function BottomNav() {
           </SheetContent>
         </Sheet>
         
-        <UserMenu />
+        <UserMenu onNavigate={() => cartOpen && setCartOpen(false)} />
       </div>
     </div>
   )
@@ -215,15 +217,17 @@ interface NavItemProps {
   icon: React.ReactNode
   label: string
   isActive: boolean
+  onClick?: () => void
 }
 
-function NavItem({ href, icon, label, isActive }: NavItemProps) {
+function NavItem({ href, icon, label, isActive, onClick }: NavItemProps) {
   return (
     <Link 
       href={href}
       className={`flex flex-col items-center justify-center w-full py-1 ${
         isActive ? "text-emerald-600" : "text-gray-500"
       }`}
+      onClick={onClick}
     >
       <div className="flex justify-center">{icon}</div>
       <span className="text-xs mt-1">{label}</span>

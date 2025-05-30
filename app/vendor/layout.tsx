@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
-import { BarChart3, Home, Package, Settings, ShoppingBag, User, Menu, X } from "lucide-react"
+import { BarChart3, Home, Package, Settings, ShoppingBag, User, Menu, X, BellRing } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VendorProvider, useVendor } from "@/lib/context/vendor-provider"
 import { Sidebar } from "@/components/vendor/sidebar"
 import Spinner from "@/components/ui/spinner"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
+import Head from "next/head"
 
 // Redirect component that handles vendor authentication status
 function VendorAuthRedirect({ children }: { children: React.ReactNode }) {
@@ -75,13 +76,32 @@ function VendorAuthRedirect({ children }: { children: React.ReactNode }) {
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { vendor } = useVendor()
+  const [newOrdersCount, setNewOrdersCount] = useState(0)
 
   // Check if it's the login page
   const isLoginPage = pathname === "/vendor/login"
   const isAuthCheckPage = pathname === "/vendor/auth-check"
 
+  // Check for new orders
+  useEffect(() => {
+    if (vendor && vendor.pincodes && vendor.pincodes.length > 0) {
+      // This would be replaced with actual order checking logic
+      // For demo purposes, we'll just set a random count
+      setNewOrdersCount(Math.floor(Math.random() * 3))
+    }
+  }, [vendor])
+
   return (
     <VendorProvider>
+      <Head>
+        <link rel="manifest" href="/vendor-manifest.json" />
+        <meta name="theme-color" content="#10b981" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="QC Vendor" />
+        <link rel="apple-touch-icon" href="/icons/vendor-icon-192x192.png" />
+      </Head>
       <VendorAuthRedirect>
         {isLoginPage || isAuthCheckPage ? (
           <main className="h-screen">{children}</main>
@@ -96,20 +116,31 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
                     <span>Vendor Portal</span>
                   </Link>
                   
-                  <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-                    <SheetTrigger asChild>
-                      <Button variant="outline" size="icon" className="md:hidden">
-                        <Menu className="h-5 w-5" />
-                        <span className="sr-only">Toggle Menu</span>
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="left" className="pr-0 sm:max-w-xs">
-                      <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-                      <div className="px-2">
-                        <Sidebar onNavItemClick={() => setSidebarOpen(false)} />
-                      </div>
-                    </SheetContent>
-                  </Sheet>
+                  <div className="flex items-center gap-4">
+                    <Link href="/vendor/orders" className="relative">
+                      <BellRing className="h-5 w-5" />
+                      {newOrdersCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                          {newOrdersCount}
+                        </span>
+                      )}
+                    </Link>
+                    
+                    <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                      <SheetTrigger asChild>
+                        <Button variant="outline" size="icon" className="md:hidden">
+                          <Menu className="h-5 w-5" />
+                          <span className="sr-only">Toggle Menu</span>
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent side="left" className="pr-0 sm:max-w-xs">
+                        <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                        <div className="px-2">
+                          <Sidebar onNavItemClick={() => setSidebarOpen(false)} />
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                  </div>
                 </div>
               </div>
             </header>

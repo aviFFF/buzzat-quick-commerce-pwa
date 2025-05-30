@@ -1,11 +1,11 @@
 {
-  "name": "Quick Commerce PWA",
-  "short_name": "QuickCommerce",
-  "description": "A Progressive Web App for Quick Commerce",
+  "name": "Quick Commerce",
+  "short_name": "QuickMart",
+  "description": "Get groceries and essentials delivered in minutes",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "theme_color": "#10b981",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -16,8 +16,27 @@
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
-  ]
+  ],
+  "orientation": "portrait",
+  "scope": "/",
+  "shortcuts": [
+    {
+      "name": "My Orders",
+      "short_name": "Orders",
+      "description": "View your order history",
+      "url": "/account/orders",
+      "icons": [{ "src": "/icons/orders.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "My Account",
+      "short_name": "Account",
+      "description": "Manage your account",
+      "url": "/account",
+      "icons": [{ "src": "/icons/account.png", "sizes": "96x96" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }

@@ -9,6 +9,12 @@ import { ArrowRight, Package, ShoppingBag, DollarSign, Clock, AlertTriangle, Tre
 import { db } from "@/lib/firebase/config"
 import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore"
 import Link from "next/link"
+import dynamic from "next/dynamic"
+
+// Dynamically import the PWA install button with no SSR
+const PWAInstallButton = dynamic(() => import("@/components/pwa-install-button"), {
+  ssr: false
+})
 
 interface Order {
   id: string
@@ -208,6 +214,15 @@ export default function VendorDashboard() {
 
   return (
     <div className="space-y-6 px-2 sm:px-4 md:px-0">
+      {/* PWA Install Button */}
+      <div className="fixed bottom-8 right-4 z-50">
+        <PWAInstallButton 
+          variant="default" 
+          className="bg-green-500 hover:bg-green-600 shadow-lg"
+          label="Install Vendor App" 
+        />
+      </div>
+      
       <div className="mt-2 sm:mt-0">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-sm sm:text-base text-muted-foreground">

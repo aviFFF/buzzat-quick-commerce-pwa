@@ -1,3 +1,5 @@
+"use client"
+
 import { Suspense } from "react"
 import Header from "@/components/header"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -5,6 +7,12 @@ import DynamicCategorySlider from "@/components/dynamic-category-slider"
 import CheckPincodeRedirect from "@/components/check-pincode-redirect"
 import BannerCardsDisplay from "@/components/banner-cards-display"
 import MobileCategoryGrid from "@/components/mobile-category-grid"
+import dynamic from "next/dynamic"
+
+// Dynamically import the PWA install button with no SSR
+const PWAInstallButton = dynamic(() => import("@/components/pwa-install-button"), {
+  ssr: false
+})
 
 // Define categories to be displayed on the homepage
 const featuredCategories = [
@@ -29,6 +37,15 @@ export default function Home() {
       <div className="container mx-auto py-2 px-4">
         {/* Check if pincode is serviceable and redirect if not */}
         <CheckPincodeRedirect />
+        
+        {/* PWA Install Button */}
+        <div className="fixed bottom-20 right-4 z-50 md:bottom-8">
+          <PWAInstallButton 
+            variant="default" 
+            className="bg-green-500 hover:bg-green-600 shadow-lg"
+            label="Install App" 
+          />
+        </div>
         
         {/* Top banners */}
         <div className="my-4">

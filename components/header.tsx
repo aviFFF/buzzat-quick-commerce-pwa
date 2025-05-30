@@ -446,12 +446,12 @@ export default function Header() {
                   )}
                 </Button>
               </SheetTrigger>
-              <SheetContent side="bottom" className="h-[80vh] rounded-t-xl px-0">
+              <SheetContent side="bottom" className="h-[80vh] rounded-t-xl px-0 md:overflow-auto overflow-hidden">
                 <SheetTitle className="sr-only">Shopping Cart</SheetTitle>
                 <div className="h-full flex flex-col px-4">
                   <div className="flex justify-between items-center pb-3 border-b mb-2">
                     <h2 className="text-xl font-bold">Your Cart</h2>
-                    <SheetClose className="h-8 w-8 p-0 flex items-center justify-center rounded-full border border-gray-200">
+                    <SheetClose className="h-8 w-8 p-0 flex items-center justify-center rounded-full border border-gray-200 md:block hidden">
                       <span className="text-xl">×</span>
                     </SheetClose>
                   </div>
@@ -463,7 +463,7 @@ export default function Header() {
                     </div>
                   ) : (
                     <>
-                      <div className="flex-1 overflow-auto pb-4">
+                      <div className="flex-1 overflow-y-auto pb-4 md:static md:h-auto max-h-[50vh] md:max-h-none">
                         {cartItems.map(item => (
                           <CartItem
                             key={item.id}
@@ -476,7 +476,7 @@ export default function Header() {
                           />
                         ))}
                       </div>
-                      <div className="border-t pt-4 mt-auto">
+                      <div className="border-t pt-4 mt-auto md:static md:pb-0 sticky bottom-0 left-0 right-0 bg-white px-4 md:px-0">
                         <div className="flex justify-between mb-2">
                           <span>Subtotal</span>
                           <span>₹{cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}</span>
@@ -489,9 +489,9 @@ export default function Header() {
                           <span>Total</span>
                           <span>₹{(cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) + 40).toFixed(2)}</span>
                         </div>
-                        <div className="pb-20">
+                        <div className="pb-20 md:pb-4">
                           <Button 
-                            className="w-full bg-green-500 hover:bg-green-600 fixed bottom-4 left-0 right-0 mx-4 z-50"
+                            className="w-full bg-green-500 hover:bg-green-600 md:static fixed bottom-4 left-0 right-0 mx-4 md:mx-0 z-10"
                             onClick={() => {
                               if (!user) {
                                 // Set a flag to redirect to checkout after login
