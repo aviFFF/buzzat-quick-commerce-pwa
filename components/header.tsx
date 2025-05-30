@@ -287,6 +287,17 @@ export default function Header() {
     }
   }
 
+  // Handle login modal
+  const handleLoginClick = () => {
+    // Clear any previous errors or state
+    setShowLoginModal(true);
+  }
+
+  // Close login modal
+  const handleCloseLoginModal = () => {
+    setShowLoginModal(false);
+  }
+
   // Determine if we're in a loading state
   const loading = !mounted || firebaseLoading || authLoading || !isAuthInitialized
 
@@ -427,7 +438,7 @@ export default function Header() {
                 variant="ghost"
                 size="sm"
                 className="text-gray-700"
-                onClick={() => setShowLoginModal(true)}
+                onClick={handleLoginClick}
                 disabled={!isAuthInitialized}
               >
                 <User size={20} className="mr-2" />
@@ -546,7 +557,7 @@ export default function Header() {
         </div>
       </div>
 
-      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
+      {showLoginModal && <LoginModal onClose={handleCloseLoginModal} />}
     </header>
   )
 }

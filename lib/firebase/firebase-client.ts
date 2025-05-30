@@ -108,6 +108,10 @@ export function initializeFirebaseApp() {
     firebaseApp = initializeApp(firebaseConfig)
     isFirebaseInitialized = true
     console.log("Firebase App initialized successfully")
+    
+    // Automatically initialize auth right after app initialization
+    // This helps prevent race conditions
+    initializeFirebaseAuth()
 
     return firebaseApp
   } catch (error) {
@@ -136,6 +140,21 @@ export function initializeFirebaseAuth() {
 
   try {
     auth = _getAuth(app)
+    
+    // Set persistence to LOCAL by default
+    // This ensures the user stays logged in across browser sessions
+    if (typeof window !== "undefined" && auth) {
+      import("firebase/auth").then(({ setPersistence, browserLocalPersistence }) => {
+        setPersistence(auth!, browserLocalPersistence)
+          .then(() => {
+            console.log("Auth persistence set to LOCAL");
+          })
+          .catch((error) => {
+            console.error("Error setting auth persistence:", error);
+          });
+      });
+    }
+    
     isAuthInitialized = true
     console.log("Firebase Auth initialized successfully")
     return auth

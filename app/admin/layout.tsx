@@ -115,10 +115,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   0
                 </span>
               </Link>
-              <div className="md:hidden">
-                <Button variant="ghost" size="sm" onClick={handleLogout}>
-                  <LogOut size={18} />
-                </Button>
+            <div className="md:hidden">
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut size={18} />
+              </Button>
               </div>
             </div>
           </header>

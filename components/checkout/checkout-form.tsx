@@ -377,7 +377,7 @@ export default function CheckoutForm() {
         
         // Use setTimeout to ensure toast is displayed before navigation
         setTimeout(() => {
-          router.push(`/checkout/success?orderId=${result.id}`)
+        router.push(`/checkout/success?orderId=${result.id}`)
         }, 500)
       }
     } catch (error) {

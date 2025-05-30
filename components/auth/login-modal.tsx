@@ -25,6 +25,35 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
   const router = useRouter()
   const [recaptchaInitialized, setRecaptchaInitialized] = useState(false)
 
+  // Cleanup any existing recaptcha elements when component mounts
+  useEffect(() => {
+    // Clear any existing recaptcha elements
+    const existingRecaptchas = document.querySelectorAll('.grecaptcha-badge');
+    existingRecaptchas.forEach(element => {
+      element.remove();
+    });
+    
+    // Also remove any hidden recaptcha iframes
+    const iframes = document.querySelectorAll('iframe[src*="recaptcha"]');
+    iframes.forEach(element => {
+      element.remove();
+    });
+    
+    return () => {
+      // Cleanup when component unmounts
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear();
+        } catch (error) {
+          console.error("Error clearing recaptcha:", error);
+        }
+        recaptchaVerifierRef.current = null;
+      }
+      
+      setRecaptchaInitialized(false);
+    };
+  }, []);
+
   // Initialize recaptcha when component mounts
   useEffect(() => {
     const initRecaptcha = async () => {
@@ -33,15 +62,11 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
         recaptchaContainerRef.current &&
         !recaptchaVerifierRef.current &&
         isAuthInitialized &&
-        !recaptchaInitialized
+        !recaptchaInitialized &&
+        !firebaseLoading
       ) {
         try {
-          // Clear any existing recaptcha elements first
-          const existingRecaptcha = document.querySelector('.grecaptcha-badge');
-          if (existingRecaptcha) {
-            existingRecaptcha.remove();
-          }
-          
+          console.log("Initializing recaptcha verifier...");
           recaptchaVerifierRef.current = await initRecaptchaVerifier("recaptcha-container");
           setRecaptchaInitialized(true);
           console.log("Recaptcha verifier initialized successfully");
@@ -53,27 +78,14 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
     };
 
     // Try to initialize recaptcha after a short delay to ensure DOM is ready
-    if (isAuthInitialized && !recaptchaInitialized) {
+    if (isAuthInitialized && !recaptchaInitialized && !firebaseLoading) {
       const timer = setTimeout(() => {
         initRecaptcha();
       }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [isAuthInitialized, recaptchaInitialized]);
-
-  // Cleanup recaptcha when component unmounts
-  useEffect(() => {
-    return () => {
-      if (recaptchaVerifierRef.current) {
-        try {
-          recaptchaVerifierRef.current.clear();
-        } catch (error) {
-          console.error("Error clearing recaptcha:", error);
-        }
-      }
-    };
-  }, []);
+  }, [isAuthInitialized, recaptchaInitialized, firebaseLoading]);
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,8 +95,12 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
     try {
       if (!recaptchaVerifierRef.current || !recaptchaInitialized) {
         // Try to initialize recaptcha again if it's not initialized
-        recaptchaVerifierRef.current = await initRecaptchaVerifier("recaptcha-container");
-        setRecaptchaInitialized(true);
+        try {
+          recaptchaVerifierRef.current = await initRecaptchaVerifier("recaptcha-container");
+          setRecaptchaInitialized(true);
+        } catch (error) {
+          throw new Error("Could not initialize recaptcha. Please refresh and try again.");
+        }
       }
 
       if (!recaptchaVerifierRef.current) {

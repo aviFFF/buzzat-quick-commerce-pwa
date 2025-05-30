@@ -17,27 +17,64 @@ export const initRecaptchaVerifier = async (containerId: string) => {
   // Wait for Auth to be initialized
   if (!isAuthInitialized) {
     console.log("Waiting for Auth to initialize before creating RecaptchaVerifier...")
-    await new Promise((resolve) => {
-      const checkInterval = setInterval(() => {
-        if (isAuthInitialized) {
+    try {
+      await new Promise((resolve, reject) => {
+        const checkInterval = setInterval(() => {
+          if (isAuthInitialized) {
+            clearInterval(checkInterval)
+            resolve(true)
+          }
+        }, 100)
+        
+        // Set a timeout to avoid waiting indefinitely
+        setTimeout(() => {
           clearInterval(checkInterval)
-          resolve(true)
-        }
-      }, 100)
-    })
+          reject(new Error("Auth initialization timeout"))
+        }, 10000) // 10 seconds timeout
+      })
+    } catch (error) {
+      console.error("Auth initialization timed out:", error)
+      throw new Error("Firebase authentication service is unavailable. Please try again later.")
+    }
   }
 
   try {
     if (!auth) {
       throw new Error("Auth is not initialized")
     }
+    
+    // Clean up any existing recaptcha verifiers
+    const existingRecaptchas = document.querySelectorAll('.grecaptcha-badge');
+    existingRecaptchas.forEach(element => {
+      element.remove();
+    });
+    
+    // Also remove any hidden recaptcha iframes
+    const iframes = document.querySelectorAll('iframe[src*="recaptcha"]');
+    iframes.forEach(element => {
+      element.remove();
+    });
 
-    return new RecaptchaVerifier(auth, containerId, {
+    // Create a new RecaptchaVerifier instance
+    const verifier = new RecaptchaVerifier(auth, containerId, {
       size: "invisible",
       callback: () => {
         console.log("Recaptcha verified")
       },
+      "expired-callback": () => {
+        console.log("Recaptcha expired, refreshing...")
+        // Force refresh the recaptcha
+        if (verifier) {
+          verifier.clear();
+          verifier.render();
+        }
+      }
     })
+    
+    // Render the recaptcha to ensure it's ready
+    await verifier.render()
+    
+    return verifier
   } catch (error) {
     console.error("Error initializing RecaptchaVerifier:", error)
     throw error

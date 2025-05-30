@@ -40,14 +40,14 @@ export default function CheckoutPage() {
   }, [mounted, loading, user, cartCount, router])
   
   if (!mounted || loading) {
-    return (
+  return (
       <main className="min-h-screen bg-gray-50">
         <Header />
         <div className="container mx-auto py-8 px-4">
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-500"></div>
           </div>
-        </div>
+            </div>
       </main>
     )
   }
