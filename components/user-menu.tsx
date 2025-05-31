@@ -63,26 +63,22 @@ export default function UserMenu({ onNavigate }: UserMenuProps) {
           <span className="text-xs mt-1">Account</span>
         </button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-[85vw] mt-auto sm:w-[350px]">
-        <div className="flex flex-col h-[50%]">
-          <div className="border-b pb-4 mb-4">
+      <SheetContent 
+        side="right" 
+        className="w-[85vw] sm:w-[350px] p-0 pt-4 z-50"
+        style={{ position: 'fixed', top: 0, bottom: 0, height: '100dvh' }}
+      >
+        <div className="flex flex-col h-full bg-white">
+          <div className="px-4 pb-4 mb-2">
             <h2 className="text-xl font-bold">My Account</h2>
             <p className="text-sm text-gray-500">{user.phoneNumber}</p>
           </div>
           
-          <div className="flex-1 overflow-auto">
-            <nav className="space-y-1">
-              <Link 
-                href="/account/profile" 
-                className="flex items-center p-3 rounded-md hover:bg-gray-100"
-                onClick={onNavigate}
-              >
-                <User size={20} className="mr-3 text-emerald-600" />
-                <span>Profile</span>
-              </Link>
+          <div className="flex-1">
+            <nav className="space-y-0">
               <Link 
                 href="/account/orders" 
-                className="flex items-center p-3 rounded-md hover:bg-gray-100"
+                className="flex items-center p-4 hover:bg-gray-50 border-b"
                 onClick={onNavigate}
               >
                 <Clock size={20} className="mr-3 text-emerald-600" />
@@ -90,7 +86,7 @@ export default function UserMenu({ onNavigate }: UserMenuProps) {
               </Link>
               <Link 
                 href="/account/addresses" 
-                className="flex items-center p-3 rounded-md hover:bg-gray-100"
+                className="flex items-center p-4 hover:bg-gray-50 border-b"
                 onClick={onNavigate}
               >
                 <MapPin size={20} className="mr-3 text-emerald-600" />
@@ -98,7 +94,7 @@ export default function UserMenu({ onNavigate }: UserMenuProps) {
               </Link>
               <Link 
                 href="/wishlist" 
-                className="flex items-center p-3 rounded-md hover:bg-gray-100"
+                className="flex items-center p-4 hover:bg-gray-50 border-b"
                 onClick={onNavigate}
               >
                 <Heart size={20} className="mr-3 text-emerald-600" />
@@ -107,7 +103,7 @@ export default function UserMenu({ onNavigate }: UserMenuProps) {
             </nav>
           </div>
           
-          <div className="border-t pt-4 mt-auto">
+          <div className="mt-auto p-4 pt-6 pb-20 sm:pb-4">
             <button 
               onClick={async () => {
                 try {
@@ -129,10 +125,9 @@ export default function UserMenu({ onNavigate }: UserMenuProps) {
                   alert("An error occurred during sign out.");
                 }
               }}
-              className="flex items-center p-3 text-red-600 w-full rounded-md hover:bg-red-50"
+              className="flex items-center justify-center p-3 text-white w-full rounded-md bg-emerald-500 hover:bg-emerald-600"
             >
-              <LogOut size={20} className="mr-3" />
-              <span>Sign Out</span>
+              <span>Logout App</span>
             </button>
           </div>
         </div>
