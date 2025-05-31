@@ -71,6 +71,15 @@ export default function VendorLogin() {
 
     try {
       console.log("Logging in with email:", email)
+      
+      // Check Firebase configuration in production
+      if (process.env.NODE_ENV === 'production') {
+        console.log("Production environment detected. Checking Firebase config...");
+        const hasFirebaseConfig = !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY && 
+                                 !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+        console.log("Firebase config available:", hasFirebaseConfig);
+      }
+      
       const result = await login(email, password)
       loginSuccessful = result.success;
 
@@ -88,12 +97,13 @@ export default function VendorLogin() {
 
         // For real accounts, wait for vendor state to update and check multiple times
         let attempts = 0;
-        const maxAttempts = 5;
-        const checkInterval = 200; // ms
+        const maxAttempts = 8; // Increased from 5 to 8
+        const checkInterval = 250; // Increased from 200 to 250 ms
 
         const checkVendorData = () => {
           attempts++;
           console.log(`Checking vendor data (attempt ${attempts}/${maxAttempts})...`);
+          console.log("Current vendor state:", vendor ? `ID: ${vendor.id || vendor.uid}` : "No vendor data");
 
           if (vendor && (vendor.id || vendor.uid)) {
             // We have vendor data with an ID
@@ -105,14 +115,35 @@ export default function VendorLogin() {
               vendorId,
               process.env.NODE_ENV === 'development' && vendor.email === 'test@example.com'
             );
-            router.push("/vendor");
+            
+            // Use direct window.location for more reliable redirect in production
+            if (process.env.NODE_ENV === 'production') {
+              window.location.href = "/vendor";
+            } else {
+              router.push("/vendor");
+            }
           } else if (attempts < maxAttempts) {
             // Try again after a short delay
             setTimeout(checkVendorData, checkInterval);
           } else {
             // Give up after max attempts
             console.error("No vendor ID available after maximum attempts");
-            setError("Authentication error: Could not retrieve vendor details");
+            
+            // In production, try one last fallback approach
+            if (process.env.NODE_ENV === 'production') {
+              console.log("Attempting fallback authentication approach...");
+              // Try to get current user directly from Firebase Auth
+              const auth = require('firebase/auth').getAuth();
+              if (auth && auth.currentUser) {
+                const uid = auth.currentUser.uid;
+                console.log("Found authenticated user with UID:", uid);
+                setVendorSessionCookies(uid, false);
+                window.location.href = "/vendor";
+                return;
+              }
+            }
+            
+            setError("Authentication error: Could not retrieve vendor details. Please try again or contact support.");
             setIsSubmitting(false);
           }
         };
@@ -127,6 +158,9 @@ export default function VendorLogin() {
           result.error.message.includes("pending") ||
           result.error.message.includes("blocked")) {
           setError("Your vendor account is not active. Please contact the admin for approval.")
+        } else if (result.error.message.includes("Firebase") || 
+                  result.error.message.includes("configuration")) {
+          setError("Login service is currently unavailable. Please try again later or contact support.")
         } else {
           setError(result.error.message)
         }

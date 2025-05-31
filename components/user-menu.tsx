@@ -63,8 +63,8 @@ export default function UserMenu({ onNavigate }: UserMenuProps) {
           <span className="text-xs mt-1">Account</span>
         </button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-[85vw] sm:w-[350px]">
-        <div className="flex flex-col h-full">
+      <SheetContent side="right" className="w-[85vw] mt-auto sm:w-[350px]">
+        <div className="flex flex-col h-[50%]">
           <div className="border-b pb-4 mb-4">
             <h2 className="text-xl font-bold">My Account</h2>
             <p className="text-sm text-gray-500">{user.phoneNumber}</p>

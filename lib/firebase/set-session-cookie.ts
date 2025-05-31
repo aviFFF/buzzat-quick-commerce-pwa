@@ -12,7 +12,24 @@ export const setCookie = (name: string, value: string, days: number = 7) => {
     date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
     expires = "; expires=" + date.toUTCString();
   }
-  document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/; SameSite=Lax";
+  
+  // Get the current domain for proper cookie setting
+  const domain = window.location.hostname;
+  const isLocalhost = domain === 'localhost' || domain === '127.0.0.1';
+  
+  // In production, set cookies for the domain; in development, don't set domain
+  const domainPart = !isLocalhost ? `; domain=${domain}` : '';
+  
+  // Set secure and SameSite attributes properly
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  
+  document.cookie = name + "=" + encodeURIComponent(value) + 
+                    expires + 
+                    domainPart + 
+                    "; path=/; SameSite=Lax" + 
+                    secure;
+  
+  console.log(`Cookie set: ${name} for domain: ${isLocalhost ? 'localhost' : domain}`);
 };
 
 /**
@@ -35,7 +52,17 @@ export const getCookie = (name: string): string | null => {
  * Removes a cookie by name
  */
 export const removeCookie = (name: string) => {
-  setCookie(name, "", -1);
+  if (typeof document === 'undefined') return;
+  
+  // Get the current domain for proper cookie removal
+  const domain = window.location.hostname;
+  const isLocalhost = domain === 'localhost' || domain === '127.0.0.1';
+  
+  // In production, set domain for removal; in development, don't set domain
+  const domainPart = !isLocalhost ? `; domain=${domain}` : '';
+  
+  document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/" + domainPart;
+  console.log(`Cookie removed: ${name}`);
 };
 
 /**

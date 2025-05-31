@@ -16,9 +16,21 @@ export const signInVendor = async (email: string, password: string) => {
     const auth = getAuth()
     if (!auth) {
       console.error("Firebase auth not initialized")
+      
+      // Check if we're in production or development
+      if (process.env.NODE_ENV === 'production') {
+        console.error("Firebase authentication failed in production environment");
+        // Log any relevant environment information that might help diagnose the issue
+        console.log("Project environment:", {
+          hasApiKey: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+          hasProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+          hasAuthDomain: !!process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+        });
+      }
+      
       return { 
         success: false, 
-        error: new Error("Firebase authentication not initialized. Please check your Firebase configuration.") 
+        error: new Error("Firebase authentication not initialized. Please try again later or contact support.") 
       }
     }
 
@@ -51,10 +63,20 @@ export const signInVendor = async (email: string, password: string) => {
     }
 
     // Only attempt Firebase auth if we're not using the test account
+    console.log("Attempting Firebase authentication with email:", email);
     const userCredential = await signInWithEmailAndPassword(auth, email, password)
     const userUid = userCredential.user.uid
     
-    console.log("User authenticated, checking vendor status: ", userUid)
+    console.log("User authenticated with Firebase, checking vendor status: ", userUid)
+    
+    // Check if Firestore is available
+    if (!db) {
+      console.error("Firestore not initialized, cannot verify vendor status");
+      return {
+        success: false,
+        error: new Error("Database connection error. Please try again later.")
+      };
+    }
     
     // Check if user has vendor role - first try direct UID
     let vendorDoc = await getDoc(doc(db, "vendors", userUid))
@@ -82,13 +104,17 @@ export const signInVendor = async (email: string, password: string) => {
       if (!querySnapshot.empty) {
         vendorDoc = querySnapshot.docs[0]
         vendorId = vendorDoc.id
+        console.log("Found vendor by email with ID:", vendorId);
       } else {
-        throw new Error("No vendor account found for this user")
+        console.error("No vendor account found for user:", userUid, "with email:", email);
+        throw new Error("No vendor account found for this user. Please contact support if you believe this is an error.")
       }
     }
     
     // Check if vendor is active
     const vendorData = vendorDoc.data() as VendorCredential
+    console.log("Vendor status:", vendorData.status);
+    
     if (vendorData.status === "blocked") {
       throw new Error("Your vendor account has been blocked. Please contact support.")
     }
@@ -98,19 +124,27 @@ export const signInVendor = async (email: string, password: string) => {
     }
     
     // Update last login timestamp
-    await updateDoc(doc(db, "vendors", vendorId), {
-      lastLogin: serverTimestamp()
-    })
+    try {
+      await updateDoc(doc(db, "vendors", vendorId), {
+        lastLogin: serverTimestamp()
+      })
+      console.log("Updated vendor last login timestamp");
+    } catch (updateError) {
+      // Don't fail login if just the timestamp update fails
+      console.error("Failed to update last login timestamp:", updateError);
+    }
     
     // Set session cookies for authenticated vendor
     setVendorSessionCookies(userUid, false);
+    console.log("Set session cookies for vendor:", userUid);
     
     return { 
       success: true, 
       user: userCredential.user,
       vendorData: {
         id: vendorId,
-        ...vendorData
+        ...vendorData,
+        uid: userUid, // Ensure Firebase UID is included and not overwritten
       }
     }
   } catch (error: any) {
@@ -129,8 +163,9 @@ export const signInVendor = async (email: string, password: string) => {
       errorMessage = "Incorrect password"
     } else if (error.code === 'auth/too-many-requests') {
       errorMessage = "Too many unsuccessful login attempts. Please try again later."
-    } else if (error.code === 'auth/invalid-api-key') {
-      errorMessage = "Firebase configuration error. Please contact support."
+    } else if (error.code === 'auth/invalid-api-key' || error.code === 'auth/app-deleted' || error.code === 'auth/app-not-authorized') {
+      errorMessage = "Authentication service is temporarily unavailable. Please try again later."
+      console.error("Firebase configuration error:", error.code);
     } else if (error.message) {
       errorMessage = error.message
     }

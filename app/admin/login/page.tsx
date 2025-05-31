@@ -35,12 +35,26 @@ export default function AdminLoginPage() {
     setLoading(true)
 
     try {
+      // Check Firebase configuration in production
+      if (process.env.NODE_ENV === 'production') {
+        console.log("Production environment detected. Checking Firebase config...");
+        const hasFirebaseConfig = !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY && 
+                                  !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+        console.log("Firebase config available:", hasFirebaseConfig);
+      }
+      
       // Get Firebase auth instance
       const auth = getAuth()
+      if (!auth) {
+        throw new Error("Firebase authentication is not initialized");
+      }
 
+      console.log("Attempting admin login with email:", email);
+      
       // Sign in with email and password
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
+      console.log("User authenticated with Firebase, checking admin status");
 
       if (!db) {
         throw new Error("Firebase Firestore is not initialized")
@@ -51,34 +65,59 @@ export default function AdminLoginPage() {
 
       if (!userDoc.exists()) {
         // User exists but not as admin
+        console.log("User not found in admins collection");
         await auth.signOut()
         setError("You don't have admin privileges.")
         setLoading(false)
         return
       }
 
-      // Set admin session cookie
-      Cookies.set("admin_session", "true", {
+      console.log("Admin authenticated successfully, setting session cookie");
+      
+      // Get the current domain for proper cookie setting
+      const domain = window.location.hostname;
+      const isLocalhost = domain === 'localhost' || domain === '127.0.0.1';
+      
+      // Set admin session cookie with proper options
+      const cookieOptions: Cookies.CookieAttributes = {
         expires: 7, // 7 days
         path: "/",
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict"
-      })
+      };
+      
+      // In production, set domain for cookies (not on localhost)
+      if (!isLocalhost) {
+        cookieOptions.domain = domain;
+      }
+      
+      // Set admin session cookies
+      Cookies.set("admin_session", "true", cookieOptions);
+      Cookies.set("admin_uid", user.uid, cookieOptions);
+      
+      console.log("Admin session cookies set, redirecting to dashboard");
 
       // Redirect to the originally requested page or default to admin dashboard
       if (redirectPath) {
         router.push(decodeURIComponent(redirectPath))
       } else {
-        router.push("/admin")
+        // Use window.location for more reliable redirect in production
+        if (process.env.NODE_ENV === 'production') {
+          window.location.href = "/admin";
+        } else {
+          router.push("/admin")
+        }
       }
     } catch (error: any) {
       console.error("Admin login error:", error)
 
       // Handle different types of Firebase auth errors
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         setError("Invalid email or password")
       } else if (error.code === 'auth/too-many-requests') {
         setError("Too many login attempts. Please try again later.")
+      } else if (error.code === 'auth/invalid-api-key' || error.code === 'auth/app-deleted' || error.code === 'auth/app-not-authorized') {
+        setError("Authentication service is temporarily unavailable. Please try again later.")
       } else {
         setError(error.message || "Failed to login")
       }
