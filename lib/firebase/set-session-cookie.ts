@@ -68,24 +68,16 @@ export const removeCookie = (name: string) => {
 /**
  * Sets session cookies for vendor authentication
  */
-export const setVendorSessionCookies = (uid: string, isTestAccount: boolean = false) => {
+export const setVendorSessionCookies = (uid: string) => {
   if (!uid) {
     console.error("Cannot set session cookies: No UID provided");
     return;
   }
   
-  console.log(`Setting vendor session cookies for UID: ${uid}, isTest: ${isTestAccount}`);
+  console.log(`Setting vendor session cookies for UID: ${uid}`);
   
   // Set a session cookie that the middleware can check
   setCookie('session', uid, 7);
-  
-  // Set a flag for test accounts in development mode
-  if (isTestAccount && process.env.NODE_ENV === 'development') {
-    setCookie('testMode', 'true', 7);
-  } else {
-    // Ensure testMode is cleared if not a test account
-    removeCookie('testMode');
-  }
   
   // Set a timestamp for when the session was created
   setCookie('sessionCreated', new Date().toISOString(), 7);

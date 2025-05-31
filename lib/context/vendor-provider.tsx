@@ -63,31 +63,6 @@ export const VendorProvider = ({ children }: { children: ReactNode }) => {
   // Fetch vendor data when user is authenticated
   const fetchVendorData = async (userId: string) => {
     try {
-      // For development test account
-      if (process.env.NODE_ENV === 'development' && userId === 'test-vendor-id') {
-        console.log("Using test vendor data in development mode");
-        const testVendor: VendorProfile = {
-          id: 'test-vendor-id',
-          uid: 'test-vendor-id',
-          name: 'Test Vendor',
-          email: 'test@example.com',
-          phone: '1234567890',
-          address: 'Test Address',
-          pincode: '123456',
-          pincodes: ['123456'],
-          isOpen: true,
-          role: 'vendor',
-          status: "active",
-          productsCount: 0,
-          joinedDate: new Date().toISOString(),
-          profileComplete: true
-        };
-        setVendor(testVendor);
-        setIsAuthenticated(true);
-        setIsLoading(false);
-        return testVendor;
-      }
-
       const vendorDoc = await getDoc(doc(db, "vendors", userId));
 
       // First try with direct vendor ID
@@ -139,32 +114,6 @@ export const VendorProvider = ({ children }: { children: ReactNode }) => {
   const refreshVendorData = async () => {
     try {
       setIsLoading(true);
-
-      // For test account in development
-      if (process.env.NODE_ENV === 'development' && vendor?.email === 'test@example.com') {
-        console.log("Refreshing test vendor data");
-        // Test vendor data is already in state, just update state to trigger re-render
-        const testVendor: VendorProfile = {
-          id: 'test-vendor-id',
-          uid: 'test-vendor-id',
-          name: 'Test Vendor',
-          email: 'test@example.com',
-          phone: '1234567890',
-          address: 'Test Address',
-          pincode: '123456',
-          pincodes: ['123456'],
-          isOpen: true,
-          role: 'vendor',
-          status: "active",
-          productsCount: 0,
-          joinedDate: new Date().toISOString(),
-          profileComplete: true
-        };
-
-        setVendor({ ...testVendor });
-        setIsLoading(false);
-        return;
-      }
 
       // For real users, fetch fresh data
       const auth = getAuth();
@@ -258,36 +207,6 @@ export const VendorProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log("Attempting login with:", email);
 
-      // Special case for test account in development
-      if (process.env.NODE_ENV === 'development' && email === 'test@example.com' && password === 'password') {
-        console.log("Using test vendor account in development");
-
-        // Set vendor data directly for test account
-        const testVendor: VendorProfile = {
-          id: 'test-vendor-id',
-          uid: 'test-vendor-id',
-          name: 'Test Vendor',
-          email: 'test@example.com',
-          phone: '1234567890',
-          address: 'Test Address',
-          pincode: '123456',
-          pincodes: ['123456'],
-          isOpen: true,
-          role: 'vendor',
-          status: "active",
-          productsCount: 0,
-          joinedDate: new Date().toISOString(),
-          profileComplete: true
-        };
-
-        setVendor(testVendor);
-        setIsAuthenticated(true);
-
-        console.log("Test account login successful - auth state updated");
-
-        return { success: true };
-      }
-
       const result = await signInVendor(email, password);
 
       if (result.success && result.vendorData) {
@@ -325,16 +244,6 @@ export const VendorProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     setIsLoading(true)
     try {
-      // For test account in development mode
-      if (process.env.NODE_ENV === 'development' && vendor?.email === 'test@example.com') {
-        console.log("Logging out test vendor account");
-        setIsAuthenticated(false);
-        setVendor(null);
-
-        // Navigation will be handled by login page
-        return { success: true };
-      }
-
       const result = await signOutVendor()
       if (result.success) {
         setIsAuthenticated(false)

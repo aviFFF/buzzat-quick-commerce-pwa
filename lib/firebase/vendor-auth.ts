@@ -261,27 +261,6 @@ export const getCurrentVendorData = async () => {
       return { success: false, error: new Error("No authenticated vendor") }
     }
 
-    // For development without Firebase, return test data
-    if (process.env.NODE_ENV === 'development' && auth.currentUser.uid === 'test-vendor-id') {
-      return { 
-        success: true, 
-        vendorData: {
-          id: 'test-vendor-id',
-          uid: 'test-vendor-id',
-          name: 'Test Vendor',
-          email: 'test@example.com',
-          phone: '1234567890',
-          address: 'Test Address',
-          pincodes: ['123456'],
-          role: 'vendor',
-          status: 'active',
-          productsCount: 0,
-          joinedDate: new Date().toISOString(),
-          profileComplete: true
-        } as VendorCredential
-      }
-    }
-
     const userUid = auth.currentUser.uid
 
     // First try direct UID

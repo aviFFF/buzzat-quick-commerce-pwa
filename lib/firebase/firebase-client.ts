@@ -25,28 +25,6 @@ let auth: Auth | null = null
 let db: Firestore | null = null
 let storage: FirebaseStorage | null = null
 
-// Helper to check environment variables
-const getEnvOrFallback = (key: string, fallback: string = "") => {
-  const value = process.env[key]
-  if (!value && process.env.NODE_ENV === "development") {
-    // Removed console.warn to reduce console noise
-    
-    // Default development fallback values for Firebase config
-    const devFallbacks: Record<string, string> = {
-      NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyAKg3CZIAW14Il0n1M6D0DcnUQw31e_4l0",
-      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "buzzat-del-app.firebaseapp.com",
-      NEXT_PUBLIC_FIREBASE_PROJECT_ID: "buzzat-del-app",
-      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "buzzat-del-app.appspot.com",
-      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "223604858508",
-      NEXT_PUBLIC_FIREBASE_APP_ID: "1:223604858508:web:f2e72a2344dd44d61ba5a9",
-      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-R6BG1Q00R6",
-    }
-    
-    return devFallbacks[key] || fallback
-  }
-  return value || fallback
-}
-
 // Check if Firebase config is valid
 const isConfigValid = (config: any) => {
   return (
@@ -79,13 +57,13 @@ export function initializeFirebaseApp() {
   try {
     // Firebase configuration
     const firebaseConfig = {
-      apiKey: getEnvOrFallback("NEXT_PUBLIC_FIREBASE_API_KEY"),
-      authDomain: getEnvOrFallback("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
-      projectId: getEnvOrFallback("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
-      storageBucket: getEnvOrFallback("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
-      messagingSenderId: getEnvOrFallback("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
-      appId: getEnvOrFallback("NEXT_PUBLIC_FIREBASE_APP_ID"),
-      measurementId: getEnvOrFallback("NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID"),
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+      measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
     }
 
     // Check if config is valid before initializing
@@ -93,15 +71,10 @@ export function initializeFirebaseApp() {
       console.error(
         "Firebase configuration is invalid. Please check your environment variables or .env.local file. " +
         "You need to set NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, " +
-        "NEXT_PUBLIC_FIREBASE_PROJECT_ID, etc. Using test account only."
+        "NEXT_PUBLIC_FIREBASE_PROJECT_ID, etc."
       )
       
-      // In development, we can still use the test account without Firebase
-      if (process.env.NODE_ENV === "development") {
-        console.log("Development mode detected. Test accounts will work without Firebase.")
-      }
-      
-      return null
+      throw new Error("Firebase configuration is invalid. Please check your environment variables.");
     }
 
     // Initialize Firebase app
@@ -117,7 +90,7 @@ export function initializeFirebaseApp() {
   } catch (error) {
     console.error("Error initializing Firebase App:", error)
     isFirebaseInitialized = false
-    return null
+    throw error;
   }
 }
 

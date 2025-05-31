@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { useVendor } from "@/lib/context/vendor-provider"
 import { AlertCircle, Info, ShieldCheck } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import DirectTestLogin from "./direct-test-login"
 import { setVendorSessionCookies } from "@/lib/firebase/set-session-cookie"
 import LoginDebug from "./debug"
 
@@ -17,7 +16,6 @@ export default function VendorLogin() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [showDevHelp, setShowDevHelp] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
 
@@ -28,9 +26,7 @@ export default function VendorLogin() {
 
       // Set session cookies with the vendor's ID
       setVendorSessionCookies(
-        vendor.uid || vendor.id, // Use UID if available, otherwise ID
-        process.env.NODE_ENV === 'development' &&
-        (vendor.email === 'test@example.com' || vendor.id === 'test-vendor-id')
+        vendor.uid || vendor.id // Use UID if available, otherwise ID
       );
 
       // Delay redirect slightly to ensure cookies are set
@@ -40,28 +36,6 @@ export default function VendorLogin() {
       }, 100);
     }
   }, [isAuthenticated, vendor, router]);
-
-  // Check if we're in development mode without Firebase configuration
-  useEffect(() => {
-    const isDev = process.env.NODE_ENV === 'development'
-
-    if (isDev) {
-      console.log("Running in development mode")
-      const hasMissingEnvVars =
-        !process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
-        !process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
-
-      setShowDevHelp(hasMissingEnvVars)
-
-      if (hasMissingEnvVars) {
-        console.log("Firebase configuration missing. Using test account is enabled.")
-
-        // Pre-fill test credentials in development mode for easier testing
-        setEmail("test@example.com")
-        setPassword("password")
-      }
-    }
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -86,19 +60,10 @@ export default function VendorLogin() {
       if (result.success) {
         console.log("Login successful");
 
-        // For test account in development, use hardcoded values
-        if (process.env.NODE_ENV === 'development' && email === 'test@example.com') {
-          const testVendorId = 'test-vendor-id';
-          console.log("Setting test account session cookies with ID:", testVendorId);
-          setVendorSessionCookies(testVendorId, true);
-          router.push("/vendor");
-          return;
-        }
-
         // For real accounts, wait for vendor state to update and check multiple times
         let attempts = 0;
-        const maxAttempts = 8; // Increased from 5 to 8
-        const checkInterval = 250; // Increased from 200 to 250 ms
+        const maxAttempts = 8;
+        const checkInterval = 250;
 
         const checkVendorData = () => {
           attempts++;
@@ -111,10 +76,7 @@ export default function VendorLogin() {
             console.log("Vendor data available. Setting session cookies with ID:", vendorId);
 
             // Set session cookies and redirect
-            setVendorSessionCookies(
-              vendorId,
-              process.env.NODE_ENV === 'development' && vendor.email === 'test@example.com'
-            );
+            setVendorSessionCookies(vendorId, false);
             
             // Use direct window.location for more reliable redirect in production
             if (process.env.NODE_ENV === 'production') {
@@ -175,27 +137,6 @@ export default function VendorLogin() {
     }
   }
 
-  // Use the test credentials automatically in development mode
-  const useTestCredentials = () => {
-    setEmail("test@example.com")
-    setPassword("password")
-  }
-
-  // Direct login handler for test account
-  const handleTestLogin = () => {
-    console.log("Using direct test account login");
-    setEmail("test@example.com");
-    setPassword("password");
-
-    // Set session cookies for test account
-    setVendorSessionCookies('test-vendor-id', true);
-
-    // Attempt immediate redirection
-    if (typeof window !== 'undefined') {
-      window.location.href = "/vendor";
-    }
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="w-full max-w-md">
@@ -219,32 +160,6 @@ export default function VendorLogin() {
             </AlertDescription>
           </Alert>
 
-          {showDevHelp && (
-            <Alert className="mb-4">
-              <Info className="h-4 w-4" />
-              <AlertTitle>Development Mode</AlertTitle>
-              <AlertDescription>
-                <p>Firebase configuration is missing or invalid.</p>
-                <p className="mt-2">Test credentials have been pre-filled for you:</p>
-                <ul className="list-disc pl-5 mt-1">
-                  <li>Email: test@example.com</li>
-                  <li>Password: password</li>
-                </ul>
-                <p className="mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleTestLogin}
-                    className="mt-1"
-                  >
-                    Login with Test Account
-                  </Button>
-                </p>
-                <p className="mt-2 text-xs">To configure Firebase, create a .env.local file in the project root with your Firebase credentials.</p>
-              </AlertDescription>
-            </Alert>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">
@@ -253,9 +168,9 @@ export default function VendorLogin() {
               <Input
                 id="email"
                 type="email"
-                placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="vendor@example.com"
                 required
               />
             </div>
@@ -266,23 +181,26 @@ export default function VendorLogin() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
                 required
-                minLength={6}
               />
             </div>
             <Button
               type="submit"
               className="w-full"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoading}
             >
-              {isSubmitting ? "Logging in..." : "Login"}
+              {isSubmitting || isLoading ? "Logging in..." : "Login"}
             </Button>
-          </form>        
-        
+          </form>
         </CardContent>
+        <CardFooter className="flex justify-center">
+          <Button variant="link" onClick={() => router.push("/vendor/forgot-password")}>
+            Forgot password?
+          </Button>
+        </CardFooter>
       </Card>
     </div>
   )
