@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useVendor } from "@/lib/context/vendor-provider"
 import { AlertCircle, Info, ShieldCheck } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -196,12 +196,7 @@ export default function VendorLogin() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center">
-          <Button variant="link" onClick={() => router.push("/vendor/forgot-password")}>
-            Forgot password?
-          </Button>
-        </CardFooter>
       </Card>
     </div>
   )
-} 
+}

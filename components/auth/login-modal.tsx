@@ -11,6 +11,7 @@ import { signInWithPhoneNumber, verifyOTP, initRecaptchaVerifier, signInWithGoog
 import { useFirebase } from "@/lib/context/firebase-provider"
 import { useRouter } from "next/navigation"
 import { AUTH_CONFIG } from "@/lib/firebase/config"
+import { useAuth } from "@/lib/context/auth-context"
 
 export function LoginModal({ onClose }: { onClose: () => void }) {
   const [phoneNumber, setPhoneNumber] = useState("")
@@ -22,11 +23,12 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
   const [verificationId, setVerificationId] = useState<string | null>(null)
   const recaptchaContainerRef = useRef<HTMLDivElement>(null)
   const recaptchaVerifierRef = useRef<any>(null)
-  const { isAuthInitialized, isLoading: firebaseLoading } = useFirebase()
+  const { isAuthInitialized, isLoading: firebaseLoading, initializeAuth } = useFirebase()
   const router = useRouter()
   const [recaptchaInitialized, setRecaptchaInitialized] = useState(false)
   const [otpCount, setOtpCount] = useState<number>(0);
   const [otpLimitReached, setOtpLimitReached] = useState<boolean>(false);
+  const { refreshAuthState } = useAuth()
 
   // Cleanup any existing recaptcha elements when component mounts
   useEffect(() => {
@@ -189,9 +191,61 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
     setError(null);
     
     try {
-      const { success, error } = await signInWithGoogle();
+      console.log("Attempting Google sign-in from login modal...");
+      
+      // Check if we're returning from a redirect
+      if (typeof window !== 'undefined' && sessionStorage.getItem('auth_redirect_started') === 'true') {
+        const redirectTimestamp = parseInt(sessionStorage.getItem('auth_redirect_timestamp') || '0');
+        const currentTime = Date.now();
+        const timeDifference = currentTime - redirectTimestamp;
+        
+        // If this is a fresh page load after redirect (within last 30 seconds)
+        if (redirectTimestamp > 0 && timeDifference < 30000) {
+          console.log("Detected return from auth redirect, clearing redirect flags");
+          sessionStorage.removeItem('auth_redirect_started');
+          sessionStorage.removeItem('auth_redirect_timestamp');
+          
+          // Close the modal after a short delay to allow auth state to update
+          setTimeout(() => {
+            refreshAuthState();
+            onClose();
+            router.refresh();
+          }, 1000);
+          
+          return;
+        } else {
+          // Clear stale redirect data
+          sessionStorage.removeItem('auth_redirect_started');
+          sessionStorage.removeItem('auth_redirect_timestamp');
+        }
+      }
+      
+      // Check if Firebase is initialized
+      if (!isAuthInitialized) {
+        console.log("Firebase auth not initialized yet, attempting manual initialization...");
+        // Try to manually initialize Firebase
+        initializeAuth();
+        
+        // Wait a bit for Firebase to initialize
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        if (!isAuthInitialized) {
+          console.error("Firebase auth still not initialized after manual attempt");
+          throw new Error("Authentication service is not ready. Please try again in a moment.");
+        }
+      }
+      
+      console.log("Firebase initialization status before sign-in:", { isAuthInitialized, firebaseLoading });
+      
+      // Try Google sign-in
+      const { success, error, user } = await signInWithGoogle();
       
       if (success) {
+        console.log("Google sign-in successful, refreshing auth state");
+        
+        // Ensure auth state is refreshed
+        refreshAuthState();
+        
         // Close the modal
         onClose();
         
@@ -203,13 +257,34 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
           setTimeout(() => {
             router.push("/checkout");
           }, 500);
+        } else {
+          // Force a refresh to update UI state
+          router.refresh();
         }
       } else {
+        console.error("Google sign-in failed:", error);
         setError((error as { message?: string })?.message || "Failed to sign in with Google. Please try again.");
       }
     } catch (error: any) {
-      console.error("Error signing in with Google:", error);
-      setError(error?.message || "Failed to sign in with Google. Please try again.");
+      console.error("Error during Google sign-in:", error);
+      
+      // Check for specific errors
+      if (error.code === 'auth/popup-closed-by-user') {
+        setError("Sign-in was cancelled. Please try again.");
+      } else if (error.code === 'auth/popup-blocked' || error.message === "popup_blocked_by_browser") {
+        setError("Sign-in popup was blocked. Please allow popups for this site and try again.");
+      } else if (error.code === 'auth/network-request-failed') {
+        setError("Network error. Please check your internet connection and try again.");
+      } else if (error.code === 'auth/web-storage-unsupported') {
+        setError("Authentication requires cookies and local storage to be enabled in your browser settings.");
+      } else {
+        setError(error?.message || "Failed to sign in with Google. Please try again.");
+      }
+      
+      // If there's a serious initialization error, suggest phone auth instead
+      if (error.message?.includes("not initialized") || error.message?.includes("not available")) {
+        setError("Google sign-in is currently unavailable. Please try phone authentication instead.");
+      }
     } finally {
       setIsGoogleLoading(false);
     }
@@ -251,7 +326,10 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
             <Button
               type="button"
               className="w-full flex items-center justify-center gap-2 bg-white text-gray-800 hover:bg-gray-100 border border-gray-300 mb-4"
-              onClick={handleGoogleSignIn}
+              onClick={() => {
+                console.log("Google sign-in button clicked");
+                handleGoogleSignIn();
+              }}
               disabled={isGoogleLoading}
             >
               {isGoogleLoading ? (

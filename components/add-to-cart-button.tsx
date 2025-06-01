@@ -4,6 +4,8 @@ import { useState } from "react"
 import { Minus, Plus, ShoppingCart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/hooks/use-cart"
+import { getButtonClass } from "@/lib/utils"
+import { usePathname } from "next/navigation"
 
 interface Product {
   id: string
@@ -23,6 +25,7 @@ export default function AddToCartButton({
   const { addToCart, cartItems, updateQuantity } = useCart()
   const cartItem = cartItems.find((item) => item.id === product.id)
   const [quantity, setQuantity] = useState(cartItem?.quantity || 0)
+  const pathname = usePathname()
 
   const handleAddToCart = () => {
     addToCart(product)
@@ -44,8 +47,11 @@ export default function AddToCartButton({
   return (
     <div className={className}>
       {quantity === 0 ? (
-        <Button onClick={handleAddToCart} className="w-full bg-green-500 hover:bg-green-600">
-          <ShoppingCart size={20} className="mr-2" />
+        <Button 
+          onClick={handleAddToCart} 
+          className={`w-full ${getButtonClass(pathname)}`}
+        >
+          <ShoppingCart size={18} className="mr-2" />
           Add to Cart
         </Button>
       ) : (

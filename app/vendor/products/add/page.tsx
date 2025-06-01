@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { useVendor } from "@/lib/context/vendor-provider"
 import { addProduct } from "@/lib/firebase/firestore"
-import { uploadProductImage, uploadMultipleProductImages, checkCloudinaryConfig } from "@/lib/cloudinary/upload"
+import { uploadProductImage, uploadMultipleProductImages, uploadImageFromUrl, checkUploadConfig } from "@/lib/upload"
 import { isCloudinaryConfigured } from "@/lib/cloudinary/config"
 import { AlertCircle, Loader2, Upload, Info, X, Image as ImageIcon, AlertTriangle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -204,25 +204,25 @@ export default function AddProductPage() {
     }
   }
 
-  // Check Cloudinary configuration
-  const checkConfig = async () => {
-    setIsConfigChecking(true)
-    setConfigError(null)
+  // Check upload configuration on component mount
+  useEffect(() => {
+    checkConfig()
+  }, [])
 
+  // Function to check upload configuration
+  const checkConfig = async () => {
     try {
-      const result = await checkCloudinaryConfig()
-      if (!result.configured) {
-        setConfigError("Cloudinary is not properly configured. Please contact the administrator.")
+      const configStatus = await checkUploadConfig()
+      console.log("Upload configuration status:", configStatus)
+      
+      if (!configStatus.firebase.configured && !configStatus.cloudinary.configured) {
+        setError("Image upload services are not properly configured. Please contact the administrator.")
       } else {
-        toast({
-          title: "Cloudinary Check Passed",
-          description: "Cloudinary is correctly configured for uploads."
-        })
+        // Show which service is being used
+        console.log(`Using ${configStatus.primaryService} as primary upload service`)
       }
-    } catch (error: any) {
-      setConfigError(`Configuration check failed: ${error.message || 'Unknown error'}`)
-    } finally {
-      setIsConfigChecking(false)
+    } catch (err) {
+      console.error("Error checking upload configuration:", err)
     }
   }
 
@@ -338,11 +338,11 @@ export default function AddProductPage() {
       let additionalImageResults: string[] = []
       let additionalImageIds: string[] = []
       
-      // 1. Upload primary image to Cloudinary
+      // 1. Upload primary image
       setUploadProgress(10)
       
       if (imageUploadMode === 'file' && primaryImage) {
-        // Upload file
+        // Upload file using unified service
         const imageUploadResult = await uploadProductImage(primaryImage, vendor?.id || 'unknown')
         
         if (!imageUploadResult.success) {
@@ -350,29 +350,18 @@ export default function AddProductPage() {
         }
         
         productImageUrl = imageUploadResult.url || ""
-        productImageId = imageUploadResult.public_id || ""
+        productImageId = imageUploadResult.public_id || imageUploadResult.path || ""
       } else if (imageUploadMode === 'url' && primaryImageUrl) {
-        // Upload from URL
+        // Upload from URL using unified service
         try {
-          const uploadResult = await fetch('/api/upload-from-url', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              imageUrl: primaryImageUrl,
-              vendorId: vendor?.id || 'unknown'
-            }),
-          });
+          const imageUploadResult = await uploadImageFromUrl(primaryImageUrl, vendor?.id || 'unknown');
           
-          if (!uploadResult.ok) {
-            const errorData = await uploadResult.json();
-            throw new Error(errorData.message || 'Failed to upload from URL');
+          if (!imageUploadResult.success) {
+            throw new Error(`Failed to upload from URL: ${imageUploadResult.errorMessage}`);
           }
           
-          const data = await uploadResult.json();
-          productImageUrl = data.url;
-          productImageId = data.public_id;
+          productImageUrl = imageUploadResult.url || "";
+          productImageId = imageUploadResult.public_id || imageUploadResult.path || "";
         } catch (error: any) {
           throw new Error(`Failed to upload from URL: ${error.message}`);
         }
@@ -382,7 +371,7 @@ export default function AddProductPage() {
       setUploadProgress(50)
       
       if (imageUploadMode === 'file' && additionalImages.length > 0) {
-        // Upload additional files
+        // Upload additional files using unified service
         const additionalUploadsResult = await uploadMultipleProductImages(
           additionalImages, 
           vendor?.id || 'unknown',
@@ -399,31 +388,20 @@ export default function AddProductPage() {
           
           additionalImageIds = additionalUploadsResult.results
             .filter(r => r.success)
-            .map(r => r.public_id || "")
+            .map(r => r.public_id || r.path || "")
         }
       } else if (imageUploadMode === 'url' && additionalImageUrls.length > 0) {
-        // Upload additional URLs
+        // Upload additional URLs using unified service
         for (const url of additionalImageUrls.filter(url => url.trim())) {
           try {
-            const uploadResult = await fetch('/api/upload-from-url', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                imageUrl: url,
-                vendorId: vendor?.id || 'unknown'
-              }),
-            });
+            const imageUploadResult = await uploadImageFromUrl(url, vendor?.id || 'unknown');
             
-            if (!uploadResult.ok) {
-              console.error('Failed to upload additional image from URL');
-              continue;
+            if (imageUploadResult.success) {
+              additionalImageResults.push(imageUploadResult.url || "");
+              additionalImageIds.push(imageUploadResult.public_id || imageUploadResult.path || "");
+            } else {
+              console.error('Failed to upload additional image from URL:', imageUploadResult.errorMessage);
             }
-            
-            const data = await uploadResult.json();
-            additionalImageResults.push(data.url);
-            additionalImageIds.push(data.public_id);
           } catch (error) {
             console.error('Error uploading additional image from URL:', error);
           }
@@ -472,7 +450,7 @@ export default function AddProductPage() {
       
       // Provide more specific error message for image upload issues
       if (errorMessage.includes("Failed to upload")) {
-        errorMessage += ". This might be due to Cloudinary configuration issues. Please try again or contact support."
+        errorMessage += ". This might be due to image upload service configuration issues. Please try again or contact support."
       }
       
       setError(errorMessage)

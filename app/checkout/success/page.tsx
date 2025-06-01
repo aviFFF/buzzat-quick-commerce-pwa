@@ -9,6 +9,7 @@ import Header from "@/components/header"
 import { getOrderById } from "@/lib/firebase/firestore"
 import ProtectedRoute from "@/components/auth/protected-route"
 import LoadingAnimation from "@/components/loading-animation"
+import { getButtonClass } from "@/lib/utils"
 
 export default function OrderSuccessPage() {
   const searchParams = useSearchParams()
@@ -69,10 +70,10 @@ export default function OrderSuccessPage() {
                 We couldn't find your order details. If you just placed an order, it may still be processing.
               </p>
               <div className="space-y-3">
-                <Button asChild className="w-full bg-green-500 hover:bg-green-600">
+                <Button asChild className={`w-full ${getButtonClass()}`}>
                   <Link href="/">Continue Shopping</Link>
                 </Button>
-                <Button asChild variant="outline" className="w-full">
+                <Button asChild variant="outline" className={`w-full ${getButtonClass()}`}>
                   <Link href="/account/orders">View All Orders</Link>
                 </Button>
               </div>
@@ -97,10 +98,10 @@ export default function OrderSuccessPage() {
               </div>
 
               <div className="space-y-3">
-                <Button asChild className="w-full bg-green-500 hover:bg-green-600">
+                <Button asChild className={`w-full ${getButtonClass()}`}>
                   <Link href="/">Continue Shopping</Link>
                 </Button>
-                <Button asChild variant="outline" className="w-full">
+                <Button asChild variant="outline" className={`w-full ${getButtonClass()}`}>
                   <Link href="/account/orders">Track Order</Link>
                 </Button>
               </div>

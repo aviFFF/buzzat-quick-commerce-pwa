@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { usePincode } from "@/lib/hooks/use-pincode"
 import { isPincodeServiceable } from "@/lib/firebase/firestore"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
+import { isAdminOrVendorPage, getButtonClass } from "@/lib/utils"
 
 export default function PincodeRequiredModal() {
   const { pincode, updatePincode, isLoading } = usePincode()
@@ -18,19 +19,28 @@ export default function PincodeRequiredModal() {
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
   const [useCurrentLocation, setUseCurrentLocation] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
 
-  // Show modal if no pincode is set
+  // Check if on admin or vendor pages
+  const isAdminOrVendor = isAdminOrVendorPage(pathname)
+
+  // Show modal if no pincode is set and not on admin/vendor pages
   useEffect(() => {
-    if (!isLoading && !pincode) {
+    if (!isLoading && !pincode && !isAdminOrVendor) {
       setOpen(true)
     }
-  }, [pincode, isLoading])
+  }, [pincode, isLoading, isAdminOrVendor])
 
   // Prevent closing the modal if no pincode is set
   const handleOpenChange = (newOpen: boolean) => {
     if (pincode || newOpen) {
       setOpen(newOpen)
     }
+  }
+
+  // Don't render on admin or vendor pages
+  if (isAdminOrVendor) {
+    return null
   }
 
   // Fetch address from pincode using Google Maps API
@@ -242,10 +252,10 @@ export default function PincodeRequiredModal() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-green-400 hover:bg-green-500 py-6 text-white"
-              disabled={inputPincode.length !== 6 || !/^\d+$/.test(inputPincode) || isChecking}
+              disabled={isLoading || !inputPincode || inputPincode.length !== 6}
+              className={`w-full ${getButtonClass(pathname)} py-6 text-white`}
             >
-              {isChecking ? "Checking..." : "Continue"}
+              {isLoading ? "Checking..." : "Continue"}
             </Button>
           </form>
         </div>

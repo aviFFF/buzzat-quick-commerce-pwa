@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/select"
 import { Bell } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import OrderNotification from "@/components/vendor/order-notification"
+import { notificationService } from "@/lib/firebase/notification-service"
 
 const ORDER_STATUS_COLORS = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -125,26 +127,30 @@ export default function VendorOrders() {
         if (newOrders.length > 0 && newOrders.length !== newOrdersCount) {
           // Only show notification if the count changed
           if (newOrdersCount > 0) {
+            const newOrderCount = newOrders.length - newOrdersCount;
+            
+            // Show toast notification
             toast({
-              title: `${newOrders.length - newOrdersCount} New Order(s)!`,
+              title: `${newOrderCount} New Order(s)!`,
               description: "You have new orders that need attention.",
               variant: "default",
               duration: 5000,
             });
+            
+            // Show browser notification and play sound
+            if (newOrderCount > 0) {
+              // Get the newest order
+              const newestOrder = newOrders[0];
+              const orderNumber = newestOrder.id.slice(0, 8).toUpperCase();
+              
+              // Show notification
+              notificationService.showNewOrderNotification(
+                newestOrder.id,
+                orderNumber
+              );
+            }
           }
           setNewOrdersCount(newOrders.length);
-          
-          // Request notification permission and show browser notification
-          if (typeof window !== 'undefined' && 'Notification' in window) {
-            Notification.requestPermission().then(permission => {
-              if (permission === 'granted' && newOrders.length > newOrdersCount) {
-                new Notification('New Orders!', {
-                  body: `You have ${newOrders.length - newOrdersCount} new order(s) that need attention.`,
-                  icon: '/icons/icon-192x192.png'
-                });
-              }
-            });
-          }
         }
 
         setOrders(ordersData);
@@ -179,14 +185,10 @@ export default function VendorOrders() {
           <p className="text-gray-500">Manage orders for your delivery areas</p>
         </div>
         <div className="flex items-center gap-2">
-          {newOrdersCount > 0 && (
-            <Button variant="outline" className="flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              <span className="bg-red-500 text-white rounded-full px-2 py-0.5 text-xs">
-                {newOrdersCount}
-              </span>
-            </Button>
-          )}
+          <OrderNotification 
+            newOrdersCount={newOrdersCount}
+            onClick={() => setFilterStatus('pending')}
+          />
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Filter by status" />

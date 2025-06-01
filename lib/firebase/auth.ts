@@ -85,14 +85,34 @@ export const initRecaptchaVerifier = async (containerId: string) => {
 // Sign in with Google
 export async function signInWithGoogle() {
   try {
+    console.log("Starting Google sign-in process...");
+    console.log("Environment:", process.env.NODE_ENV);
+    console.log("Auth emulator enabled:", process.env.NEXT_PUBLIC_USE_AUTH_EMULATOR === "true");
+    
     if (!auth) {
-      console.error("Auth is not initialized")
-      return { success: false, error: new Error("Auth is not initialized") }
+      console.error("Auth is not initialized, attempting to initialize it now");
+      const authInstance = initializeFirebaseApp();
+      if (!authInstance) {
+        console.error("Failed to initialize Firebase app");
+        return { success: false, error: new Error("Authentication service is not available. Please try again later.") };
+      }
+    }
+
+    // Double check auth is available
+    if (!auth) {
+      console.error("Auth is still not initialized after initialization attempt");
+      return { success: false, error: new Error("Authentication service is not available. Please try again later.") };
     }
 
     // DEVELOPMENT WORKAROUND: Check if we're in development mode
-    if (process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_USE_AUTH_EMULATOR === "true") {
-      console.log("Using development auth workaround - bypassing Firebase Google auth")
+    const isDevelopment = process.env.NODE_ENV === "development";
+    const useAuthEmulator = process.env.NEXT_PUBLIC_USE_AUTH_EMULATOR === "true";
+    
+    console.log("Using development mode:", isDevelopment);
+    console.log("Using auth emulator:", useAuthEmulator);
+    
+    if (isDevelopment || useAuthEmulator) {
+      console.log("Using development auth workaround - bypassing Firebase Google auth");
       
       // Create a mock user
       const mockUser = {
@@ -106,18 +126,21 @@ export async function signInWithGoogle() {
           creationTime: new Date().toISOString(),
           lastSignInTime: new Date().toISOString()
         }
-      }
+      };
       
       // Store the mock user in localStorage to simulate being signed in
-      localStorage.setItem("dev-auth-user", JSON.stringify(mockUser))
+      localStorage.setItem("dev-auth-user", JSON.stringify(mockUser));
       
       // Trigger a storage event to notify other tabs/components
-      window.dispatchEvent(new Event("storage"))
+      window.dispatchEvent(new Event("storage"));
       
-      return { success: true, user: mockUser }
+      console.log("Mock user created:", mockUser);
+      
+      return { success: true, user: mockUser };
     }
 
     // PRODUCTION: Use actual Firebase authentication
+    console.log("Creating Google auth provider...");
     const provider = new GoogleAuthProvider();
     
     // Add scopes if needed
@@ -131,15 +154,91 @@ export async function signInWithGoogle() {
     
     console.log("Initiating Google sign-in...");
     
-    // First try with redirect method instead of popup
+    // Check if we're in a mobile browser
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    console.log("Device detection - Mobile:", isMobile);
+    
+    // Add a slight delay to ensure the browser is ready to show the popup
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Try popup method first for desktop, redirect for mobile
+    if (!isMobile) {
+      try {
+        console.log("Attempting sign-in with popup...");
+        
+        // Check if Firebase is properly initialized
+        if (!isAuthInitialized) {
+          console.warn("Auth not fully initialized yet, waiting briefly before proceeding...");
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        // Ensure auth is still available
+        if (!auth) {
+          throw new Error("Auth became unavailable");
+        }
+        
+        // Skip the popup blocker check as it might be causing issues
+        // Instead, try the popup directly and handle any errors
+        console.log("Attempting sign-in popup directly");
+        
+        const result = await signInWithPopup(auth, provider);
+        
+        // Get the Google OAuth access token
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        const token = credential?.accessToken;
+        
+        // The signed-in user info
+        const user = result.user;
+        
+        console.log("User successfully authenticated with Google:", user.displayName);
+        
+        // Force refresh the auth state
+        await auth.updateCurrentUser(user);
+        
+        return { 
+          success: true, 
+          user: result.user,
+          token: token
+        }
+      } catch (popupError: any) {
+        console.error("Popup sign-in failed:", popupError);
+        console.error("Error code:", popupError.code);
+        console.error("Error message:", popupError.message);
+        
+        // Check if this is our custom popup blocker error
+        if (popupError.message === "popup_blocked_by_browser" || 
+            popupError.code === 'auth/popup-closed-by-user' || 
+            popupError.code === 'auth/popup-blocked' ||
+            popupError.code === 'auth/cancelled-popup-request') {
+          
+          console.log("Popup was blocked or closed, trying redirect method instead...");
+          // Fall through to redirect method
+        } else {
+          // For other errors, re-throw
+          throw popupError;
+        }
+      }
+    }
+    
+    // Use redirect method as fallback or for mobile
+    console.log("Using redirect method for authentication...");
+    
+    // Check if we're coming back from a redirect
     try {
-      console.log("Attempting sign-in with redirect...");
-      // Check if we're coming back from a redirect
+      // Ensure auth is still available
+      if (!auth) {
+        throw new Error("Auth became unavailable");
+      }
+      
       const result = await getRedirectResult(auth);
       
       if (result) {
         // User has been redirected back after authentication
         console.log("User returned from redirect flow:", result.user.displayName);
+        
+        // Force refresh the auth state
+        await auth.updateCurrentUser(result.user);
+        
         return { 
           success: true, 
           user: result.user,
@@ -147,34 +246,30 @@ export async function signInWithGoogle() {
       } else {
         // Start the redirect flow
         console.log("Starting redirect flow for authentication...");
+        // Store a flag in sessionStorage to detect redirect return
+        sessionStorage.setItem('auth_redirect_started', 'true');
+        sessionStorage.setItem('auth_redirect_timestamp', Date.now().toString());
+        
+        // Ensure auth is still available
+        if (!auth) {
+          throw new Error("Auth became unavailable");
+        }
+        
         await signInWithRedirect(auth, provider);
         // This code won't execute as the page will redirect
         return { success: true };
       }
     } catch (redirectError) {
-      console.error("Redirect sign-in failed, falling back to popup:", redirectError);
-      
-      // Fall back to popup method
-      console.log("Trying popup method instead...");
-      const result = await signInWithPopup(auth, provider);
-      
-      // Get the Google OAuth access token
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      const token = credential?.accessToken;
-      
-      // The signed-in user info
-      const user = result.user;
-      
-      console.log("User successfully authenticated with Google:", user.displayName);
-      
-      return { 
-        success: true, 
-        user: result.user,
-        token: token
-      }
+      console.error("Redirect sign-in failed:", redirectError);
+      throw redirectError;
     }
   } catch (error: any) {
     console.error("Error signing in with Google:", error);
+    console.error("Error details:", JSON.stringify({
+      code: error.code,
+      message: error.message,
+      stack: error.stack
+    }));
     
     // Handle specific error cases
     if (error.code === 'auth/popup-closed-by-user') {
@@ -182,14 +277,32 @@ export async function signInWithGoogle() {
         success: false, 
         error: new Error("Sign-in was cancelled. Please try again.")
       };
-    } else if (error.code === 'auth/popup-blocked') {
+    } else if (error.code === 'auth/popup-blocked' || error.message === "popup_blocked_by_browser") {
       return { 
         success: false, 
         error: new Error("Sign-in popup was blocked by your browser. Please allow popups for this site or try again in a new tab.")
       };
+    } else if (error.code === 'auth/network-request-failed') {
+      return {
+        success: false,
+        error: new Error("Network error. Please check your internet connection and try again.")
+      };
+    } else if (error.code === 'auth/internal-error') {
+      return {
+        success: false,
+        error: new Error("Authentication service encountered an internal error. Please try again later.")
+      };
+    } else if (error.code === 'auth/web-storage-unsupported') {
+      return {
+        success: false,
+        error: new Error("Authentication requires cookies and local storage to be enabled in your browser settings.")
+      };
     }
     
-    return { success: false, error }
+    return { 
+      success: false, 
+      error: new Error(error.message || "Failed to sign in with Google. Please try again later.")
+    };
   }
 }
 

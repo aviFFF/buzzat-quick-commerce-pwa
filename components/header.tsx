@@ -33,6 +33,7 @@ import { isPincodeServiceable, getAllCategories } from "@/lib/firebase/firestore
 import { useRouter, usePathname } from "next/navigation"
 import CartItem from "./cart-item"
 import { ProductSearch } from "./product-search"
+import { isAdminOrVendorPage, getButtonClass } from "@/lib/utils"
 
 interface Category {
   id: string;
@@ -302,7 +303,7 @@ export default function Header() {
   const loading = !mounted || firebaseLoading || authLoading || !isAuthInitialized
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b shadow-sm">
+    <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
       {/* Mobile header */}
       <div className="md:hidden">
         <div className="flex items-center justify-between px-4 h-14">
@@ -451,7 +452,7 @@ export default function Header() {
                 <Button variant="outline" size="sm" className="relative">
                   <ShoppingCart size={20} />
                   {cartCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                       {cartCount}
                     </span>
                   )}
@@ -462,15 +463,12 @@ export default function Header() {
                 <div className="h-full flex flex-col px-4">
                   <div className="flex justify-between items-center pb-3 border-b mb-2">
                     <h2 className="text-xl font-bold">Your Cart</h2>
-                    <SheetClose className="h-8 w-8 p-0 flex items-center justify-center rounded-full border border-gray-200 md:block hidden">
-                      <span className="text-xl">×</span>
-                    </SheetClose>
                   </div>
                   {cartItems.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center">
                       <ShoppingCart size={64} className="text-gray-300 mb-4" />
                       <p className="text-gray-500">Your cart is empty</p>
-                      <Button className="mt-4 bg-green-500 hover:bg-green-600">Start Shopping</Button>
+                      <Button className={`mt-4 ${getButtonClass(pathname)}`}>Start Shopping</Button>
                     </div>
                   ) : (
                     <>
@@ -502,7 +500,7 @@ export default function Header() {
                         </div>
                         <div className="pb-20 md:pb-4">
                           <Button 
-                            className="w-full bg-green-500 hover:bg-green-600 md:static fixed bottom-4 left-0 right-0 mx-4 md:mx-0 z-10"
+                            className={`w-full ${getButtonClass(pathname)} md:static fixed bottom-4 left-0 right-0 mx-4 md:mx-0 z-10`}
                             onClick={() => {
                               if (!user) {
                                 // Set a flag to redirect to checkout after login

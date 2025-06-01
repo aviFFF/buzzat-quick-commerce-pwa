@@ -66,6 +66,73 @@ export const uploadProductImage = async (file: File, vendorId: string, attempt =
 }
 
 /**
+ * Uploads an image from a URL to Firebase Storage
+ * @param imageUrl The URL of the image to upload
+ * @param vendorId The vendor ID to associate with the file
+ * @param attempt Current retry attempt (internal use)
+ * @returns Object with success status, URL, and path
+ */
+export const uploadImageFromUrl = async (imageUrl: string, vendorId: string, attempt = 1): Promise<{
+  success: boolean;
+  url?: string;
+  path?: string;
+  error?: any;
+  errorCode?: string;
+  errorMessage?: string;
+}> => {
+  try {
+    console.log(`Uploading image from URL (attempt ${attempt}/${MAX_RETRIES}): ${imageUrl}`)
+    
+    // Fetch the image
+    const response = await fetch(imageUrl)
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image from URL: ${response.statusText}`)
+    }
+    
+    // Get image data as blob
+    const blob = await response.blob()
+    
+    // Generate a unique filename
+    const fileExtension = imageUrl.split('.').pop()?.split('?')[0] || 'jpg'
+    const fileName = `products/${vendorId}/${Date.now()}_from_url.${fileExtension}`
+    
+    // Upload to Firebase Storage
+    const storageRef = ref(storage, fileName)
+    
+    // Set metadata
+    const metadata = {
+      contentType: blob.type,
+      customMetadata: {
+        'vendorId': vendorId,
+        'sourceUrl': imageUrl
+      }
+    }
+    
+    await uploadBytes(storageRef, blob, metadata)
+    const downloadURL = await getDownloadURL(storageRef)
+    
+    return { success: true, url: downloadURL, path: fileName }
+  } catch (error: any) {
+    console.error(`Error uploading image from URL (attempt ${attempt}/${MAX_RETRIES}):`, error)
+    
+    // Retry if not exceeded max attempts
+    if (attempt < MAX_RETRIES) {
+      console.log(`Retrying upload after ${RETRY_DELAY}ms...`)
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+      return uploadImageFromUrl(imageUrl, vendorId, attempt + 1)
+    }
+    
+    return { 
+      success: false, 
+      error,
+      errorCode: error.code || 'unknown',
+      errorMessage: error.message || 'Unknown error during upload'
+    }
+  }
+}
+
+/**
  * Uploads multiple product images with progress tracking
  * @param files Array of files to upload
  * @param vendorId The vendor ID to associate with the files

@@ -10,6 +10,7 @@ import { db } from "@/lib/firebase/config"
 import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore"
 import Link from "next/link"
 import dynamic from "next/dynamic"
+import { notificationService } from "@/lib/firebase/notification-service"
 
 // Dynamically import the PWA install button with no SSR
 const PWAInstallButton = dynamic(() => import("@/components/pwa-install-button"), {
@@ -47,6 +48,7 @@ export default function VendorDashboard() {
     recentOrders: [],
     hasLoaded: false
   })
+  const [showNotificationDemo, setShowNotificationDemo] = useState(false)
 
   // Check authentication status
   useEffect(() => {
@@ -187,6 +189,21 @@ export default function VendorDashboard() {
     fetchDashboardData()
   }, [vendor])
 
+  // Request notification permission
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      // Check if we haven't asked for permission yet
+      if (Notification.permission === 'default') {
+        // Show notification demo after a delay
+        const timer = setTimeout(() => {
+          setShowNotificationDemo(true);
+        }, 3000);
+        
+        return () => clearTimeout(timer);
+      }
+    }
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-60px)]">
@@ -229,6 +246,40 @@ export default function VendorDashboard() {
           Welcome back, {vendor.name}! Here's an overview of your store.
         </p>
       </div>
+
+      {/* Notification permission prompt */}
+      {showNotificationDemo && (
+        <Card className="bg-orange-50 border-orange-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Enable Order Notifications</CardTitle>
+            <CardDescription>
+              Get instant alerts when new orders arrive, even when you're not looking at this screen.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Button 
+                variant="default" 
+                className="bg-orange-500 hover:bg-orange-600"
+                onClick={() => {
+                  notificationService.requestPermission();
+                  setShowNotificationDemo(false);
+                }}
+              >
+                Enable Notifications
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  setShowNotificationDemo(false);
+                }}
+              >
+                Maybe Later
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stat cards - 2 column on small mobile, 2 column on medium, 4 column on large */}
       <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">

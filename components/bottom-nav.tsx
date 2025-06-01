@@ -146,22 +146,15 @@ export default function BottomNav() {
             </button>
           </SheetTrigger>
           <SheetContent side="bottom" className="h-[85vh] rounded-t-xl px-0 overflow-y-auto">
-            <SheetTitle className="sr-only">Shopping Cart</SheetTitle>
-            <div className="flex justify-center mb-2">
-              <div className="w-12 h-1.5 bg-gray-300 rounded-full mt-1"></div>
-            </div>
             <div className="h-full flex flex-col px-4 pb-6">
               <div className="flex justify-between items-center pb-3 border-b mb-2">
                 <h2 className="text-xl font-bold">Your Cart</h2>
-                <SheetClose className="h-8 w-8 p-0 flex items-center justify-center rounded-full border border-gray-200 md:block hidden">
-                  <span className="text-xl">×</span>
-                </SheetClose>
               </div>
               {cartItems.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center">
                   <ShoppingCart size={64} className="text-gray-300 mb-4" />
                   <p className="text-gray-500">Your cart is empty</p>
-                  <Button className="mt-4 bg-emerald-500 hover:bg-emerald-600">Start Shopping</Button>
+                  <Button ref="/" className="mt-4 bg-emerald-500 hover:bg-emerald-600">Start Shopping</Button>
                 </div>
               ) : (
                 <>

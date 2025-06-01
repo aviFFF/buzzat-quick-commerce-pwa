@@ -10,6 +10,8 @@ import { Sidebar } from "@/components/vendor/sidebar"
 import Spinner from "@/components/ui/spinner"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import Head from "next/head"
+import { Toaster } from "@/components/ui/toaster"
+import Script from "next/script"
 
 // Redirect component that handles vendor authentication status
 function VendorAuthRedirect({ children }: { children: React.ReactNode }) {
@@ -158,6 +160,23 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
           </div>
         )}
       </VendorAuthRedirect>
+      <Toaster />
+      
+      {/* Notification sound preload */}
+      <Script id="notification-preload" strategy="afterInteractive">
+        {`
+          if (typeof window !== 'undefined') {
+            // Preload notification sound
+            const audio = new Audio('/sounds/new-order.mp3');
+            audio.preload = 'auto';
+            
+            // Request notification permission if previously granted
+            if ('Notification' in window && Notification.permission === 'granted') {
+              console.log('Notification permission already granted');
+            }
+          }
+        `}
+      </Script>
     </VendorProvider>
   )
 } 

@@ -2,7 +2,7 @@
 
 // This file handles Firebase initialization on the client side only
 import { initializeApp, getApps, FirebaseApp } from "firebase/app"
-import { getAuth as _getAuth, Auth } from "firebase/auth"
+import { getAuth as _getAuth, Auth, connectAuthEmulator } from "firebase/auth"
 import { 
   getFirestore as _getFirestore, 
   Firestore, 
@@ -24,6 +24,13 @@ let firebaseApp: FirebaseApp | null = null
 let auth: Auth | null = null
 let db: Firestore | null = null
 let storage: FirebaseStorage | null = null
+
+// Debug logging function
+const debugLog = (message: string, ...args: any[]) => {
+  if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_DEBUG_FIREBASE === 'true') {
+    console.log(`[Firebase Debug] ${message}`, ...args);
+  }
+};
 
 // Check if Firebase config is valid
 const isConfigValid = (config: any) => {
@@ -51,10 +58,13 @@ export function initializeFirebaseApp() {
   if (getApps().length > 0) {
     firebaseApp = getApps()[0]
     isFirebaseInitialized = true
+    debugLog("Firebase App already initialized, returning existing instance");
     return firebaseApp
   }
 
   try {
+    debugLog("Initializing Firebase App...");
+    
     // Firebase configuration
     const firebaseConfig = {
       apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -74,10 +84,23 @@ export function initializeFirebaseApp() {
         "NEXT_PUBLIC_FIREBASE_PROJECT_ID, etc."
       )
       
+      // Log specific missing values to help debugging
+      console.error("Missing Firebase config values:", {
+        apiKey: !firebaseConfig.apiKey,
+        authDomain: !firebaseConfig.authDomain,
+        projectId: !firebaseConfig.projectId
+      });
+      
       throw new Error("Firebase configuration is invalid. Please check your environment variables.");
     }
 
     // Initialize Firebase app
+    debugLog("Firebase config is valid, initializing app with config:", {
+      apiKey: firebaseConfig.apiKey ? "***" : undefined,
+      authDomain: firebaseConfig.authDomain,
+      projectId: firebaseConfig.projectId
+    });
+    
     firebaseApp = initializeApp(firebaseConfig)
     isFirebaseInitialized = true
     console.log("Firebase App initialized successfully")
@@ -112,7 +135,16 @@ export function initializeFirebaseAuth() {
   }
 
   try {
+    debugLog("Initializing Firebase Auth...");
     auth = _getAuth(app)
+    
+    // Connect to auth emulator in development if configured
+    if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_AUTH_EMULATOR === 'true') {
+      const emulatorHost = process.env.NEXT_PUBLIC_AUTH_EMULATOR_HOST || 'localhost';
+      const emulatorPort = process.env.NEXT_PUBLIC_AUTH_EMULATOR_PORT || '9099';
+      debugLog(`Connecting to Auth emulator at ${emulatorHost}:${emulatorPort}`);
+      connectAuthEmulator(auth, `http://${emulatorHost}:${emulatorPort}`);
+    }
     
     // Set persistence to LOCAL by default
     // This ensures the user stays logged in across browser sessions
@@ -120,11 +152,26 @@ export function initializeFirebaseAuth() {
       import("firebase/auth").then(({ setPersistence, browserLocalPersistence }) => {
         setPersistence(auth!, browserLocalPersistence)
           .then(() => {
-            console.log("Auth persistence set to LOCAL");
+            debugLog("Auth persistence set to LOCAL");
           })
           .catch((error) => {
             console.error("Error setting auth persistence:", error);
           });
+      });
+    }
+    
+    // Log auth state changes in development
+    if (process.env.NODE_ENV === 'development') {
+      auth.onAuthStateChanged((user) => {
+        if (user) {
+          debugLog("Auth state changed: User signed in", { 
+            uid: user.uid,
+            email: user.email,
+            provider: user.providerData[0]?.providerId
+          });
+        } else {
+          debugLog("Auth state changed: User signed out");
+        }
       });
     }
     

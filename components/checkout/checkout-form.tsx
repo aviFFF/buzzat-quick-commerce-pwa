@@ -3,8 +3,8 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { CreditCard, MapPin, Truck, Clock, ChevronRight, Plus, Edit, Check, Home } from "lucide-react"
+import { useRouter, usePathname } from "next/navigation"
+import { CreditCard, MapPin, Truck, Clock, ChevronRight, Plus, Edit, Check, Home, Briefcase } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,6 +17,7 @@ import { createOrder } from "@/lib/firebase/firestore"
 import { usePincode } from "@/lib/hooks/use-pincode"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
+import { getButtonClass } from "@/lib/utils"
 
 // Define address type
 interface SavedAddress {
@@ -32,6 +33,7 @@ interface SavedAddress {
 
 export default function CheckoutForm() {
   const router = useRouter()
+  const pathname = usePathname()
   const { toast } = useToast()
   const { cartItems, clearCart } = useCart()
   const { user } = useAuth()
@@ -461,7 +463,7 @@ export default function CheckoutForm() {
                   savedAddresses.map(address => (
                     <Card 
                       key={address.id} 
-                      className={`cursor-pointer border ${selectedAddressId === address.id ? 'border-green-500' : 'border-gray-200'}`}
+                      className={`cursor-pointer border ${selectedAddressId === address.id ? 'border-orange-500' : 'border-gray-200'}`}
                       onClick={() => selectAddress(address)}
                     >
                       <CardContent className="p-3">
@@ -527,18 +529,32 @@ export default function CheckoutForm() {
                   <div className="col-span-2">
                     <Label htmlFor="type" className="text-sm">Address Type</Label>
                     <div className="flex gap-2 mt-1">
-                      {["Home", "Work", "Other"].map(type => (
-                        <Button
-                          key={type}
-                          type="button"
-                          variant={addressFormData.type === type ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setAddressFormData(prev => ({ ...prev, type }))}
-                          className={addressFormData.type === type ? "bg-green-500 hover:bg-green-600" : ""}
-                        >
-                          {type}
-                        </Button>
-                      ))}
+                      <Button
+                        type="button"
+                        onClick={() => setAddressFormData({ ...addressFormData, type: "home" })}
+                        className={addressFormData.type === "home" ? getButtonClass(pathname) : ""}
+                      >
+                        <Home size={16} className="mr-2" />
+                        Home
+                      </Button>
+                      
+                      <Button
+                        type="button"
+                        onClick={() => setAddressFormData({ ...addressFormData, type: "work" })}
+                        className={addressFormData.type === "work" ? getButtonClass(pathname) : ""}
+                      >
+                        <Briefcase size={16} className="mr-2" />
+                        Work
+                      </Button>
+                      
+                      <Button
+                        type="button"
+                        onClick={() => setAddressFormData({ ...addressFormData, type: "other" })}
+                        className={addressFormData.type === "other" ? getButtonClass(pathname) : ""}
+                      >
+                        <MapPin size={16} className="mr-2" />
+                        Other
+                      </Button>
                     </div>
                   </div>
                   
@@ -608,7 +624,7 @@ export default function CheckoutForm() {
                   <Button 
                     type="button" 
                     onClick={saveAddress}
-                    className="bg-green-500 hover:bg-green-600"
+                    className={getButtonClass(pathname)}
                     disabled={!addressFormData.address || !addressFormData.pincode}
                   >
                     Save Address
@@ -629,7 +645,7 @@ export default function CheckoutForm() {
           onValueChange={(value) => handleRadioChange("deliveryOption", value)}
           className="space-y-2"
         >
-          <div className={`flex items-center p-3 rounded-lg border ${formData.deliveryOption === "express" ? "border-green-500 bg-green-50" : "border-gray-200"}`}>
+          <div className={`flex items-center p-3 rounded-lg border ${formData.deliveryOption === "express" ? "border-orange-500 bg-orange-50" : "border-gray-200"}`}>
             <RadioGroupItem value="express" id="express" className="mr-3" />
             <div className="flex items-start flex-1">
               <Clock size={18} className="text-green-500 mr-2 mt-0.5" />
@@ -640,7 +656,7 @@ export default function CheckoutForm() {
             </div>
           </div>
 
-          <div className={`flex items-center p-3 rounded-lg border ${formData.deliveryOption === "standard" ? "border-green-500 bg-green-50" : "border-gray-200"}`}>
+          <div className={`flex items-center p-3 rounded-lg border ${formData.deliveryOption === "standard" ? "border-orange-500 bg-orange-50" : "border-gray-200"}`}>
             <RadioGroupItem value="standard" id="standard" className="mr-3" />
             <div className="flex items-start flex-1">
               <Truck size={18} className="text-green-500 mr-2 mt-0.5" />
@@ -682,7 +698,7 @@ export default function CheckoutForm() {
           onValueChange={(value) => handleRadioChange("paymentMethod", value)}
           className="space-y-2"
         >
-          <div className={`flex items-center p-3 rounded-lg border ${formData.paymentMethod === "cod" ? "border-green-500 bg-green-50" : "border-gray-200"}`}>
+          <div className={`flex items-center p-3 rounded-lg border ${formData.paymentMethod === "cod" ? "border-orange-500 bg-orange-50" : "border-gray-200"}`}>
             <RadioGroupItem value="cod" id="cod" className="mr-3" />
             <div>
               <Label htmlFor="cod" className="font-medium cursor-pointer">Cash on Delivery</Label>
@@ -690,7 +706,7 @@ export default function CheckoutForm() {
             </div>
           </div>
 
-          <div className={`flex items-center p-3 rounded-lg border ${formData.paymentMethod === "online" ? "border-green-500 bg-green-50" : "border-gray-200"}`}>
+          <div className={`flex items-center p-3 rounded-lg border ${formData.paymentMethod === "online" ? "border-orange-500 bg-orange-50" : "border-gray-200"}`}>
             <RadioGroupItem value="online" id="online" className="mr-3" />
             <div>
               <Label htmlFor="online" className="font-medium cursor-pointer">Online Payment</Label>
@@ -700,7 +716,7 @@ export default function CheckoutForm() {
         </RadioGroup>
       </div>
 
-      <Button type="submit" className="w-full bg-green-500 hover:bg-green-600" disabled={isSubmitting || !selectedAddress}>
+      <Button type="submit" className={`w-full ${getButtonClass(pathname)}`} disabled={isSubmitting || !selectedAddress}>
         {isSubmitting ? "Processing..." : "Place Order"}
       </Button>
     </form>

@@ -8,6 +8,7 @@ import CheckPincodeRedirect from "@/components/check-pincode-redirect"
 import BannerCardsDisplay from "@/components/banner-cards-display"
 import MobileCategoryGrid from "@/components/mobile-category-grid"
 import dynamic from "next/dynamic"
+import { getButtonClass } from "@/lib/utils"
 
 // Dynamically import the PWA install button with no SSR
 const PWAInstallButton = dynamic(() => import("@/components/pwa-install-button"), {
@@ -42,7 +43,7 @@ export default function Home() {
         <div className="fixed bottom-20 right-4 z-50 md:bottom-8">
           <PWAInstallButton 
             variant="default" 
-            className="bg-green-500 hover:bg-green-600 shadow-lg"
+            className="customer-btn shadow-lg"
             label="Install App" 
           />
         </div>

@@ -2,12 +2,14 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Plus, Minus } from "lucide-react"
+import { Plus, Minus, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/hooks/use-cart"
 import { getProductsByPincode } from "@/lib/firebase/firestore"
 import { usePincode } from "@/lib/hooks/use-pincode"
 import { Loader2 } from "lucide-react"
+import { getButtonClass } from "@/lib/utils"
+import { usePathname } from "next/navigation"
 
 interface Product {
   id: string
@@ -22,6 +24,7 @@ export default function ProductSlider({ category }: { category: string }) {
   const { pincode } = usePincode()
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const pathname = usePathname()
 
   useEffect(() => {
     const fetchProducts = async () => {

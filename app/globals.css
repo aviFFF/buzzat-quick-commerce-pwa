@@ -24,6 +24,19 @@
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
     --radius: 0.5rem;
+    
+    /* Custom orange color palette for customer interface */
+    --orange-50: 33 100% 96%;
+    --orange-100: 34 100% 92%;
+    --orange-200: 32 98% 83%;
+    --orange-300: 30 97% 72%;
+    --orange-400: 27 96% 61%;
+    --orange-500: 25 95% 53%;
+    --orange-600: 21 90% 48%;
+    --orange-700: 17 88% 40%;
+    --orange-800: 15 79% 34%;
+    --orange-900: 15 75% 28%;
+    --orange-950: 12 69% 15%;
   }
 
   .dark {
@@ -56,6 +69,49 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Customer interface specific styles */
+.customer-btn {
+  @apply bg-orange-500 hover:bg-orange-600;
+}
+
+/* Replace green colors with orange for customer interface */
+.bg-green-50 {
+  @apply bg-orange-50;
+}
+.bg-green-100 {
+  @apply bg-orange-100;
+}
+.bg-green-400 {
+  @apply bg-orange-400;
+}
+.bg-green-500 {
+  @apply bg-orange-500;
+}
+.bg-green-600 {
+  @apply bg-orange-600;
+}
+.bg-green-700 {
+  @apply bg-orange-700;
+}
+
+.text-green-500 {
+  @apply text-orange-500;
+}
+.text-green-600 {
+  @apply text-orange-600;
+}
+.text-green-800 {
+  @apply text-orange-800;
+}
+
+.border-green-500 {
+  @apply border-orange-500;
+}
+
+.ring-green-500 {
+  @apply ring-orange-500;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */

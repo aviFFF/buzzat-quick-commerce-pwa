@@ -9,6 +9,8 @@ import { getProductsByPincode } from "@/lib/firebase/firestore"
 import { usePincode } from "@/lib/hooks/use-pincode"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { getButtonClass } from "@/lib/utils"
+import { usePathname } from "next/navigation"
 
 interface Product {
   id: string
@@ -23,7 +25,9 @@ export default function ProductGrid({ category }: { category: string }) {
   const { pincode } = usePincode()
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadingProductId, setLoadingProductId] = useState<string | null>(null)
   const [addedProducts, setAddedProducts] = useState<Record<string, boolean>>({})
+  const pathname = usePathname()
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -63,6 +67,7 @@ export default function ProductGrid({ category }: { category: string }) {
   }, [category, pincode])
 
   const handleAddToCart = (product: Product) => {
+    setLoadingProductId(product.id)
     addToCart(product)
     console.log("Product added to cart:", product)
     
@@ -73,6 +78,7 @@ export default function ProductGrid({ category }: { category: string }) {
     // Reset after animation
     setTimeout(() => {
       setAddedProducts(prev => ({ ...prev, [product.id]: false }))
+      setLoadingProductId(null)
     }, 1500)
   }
 
@@ -108,21 +114,17 @@ export default function ProductGrid({ category }: { category: string }) {
           <div className="flex justify-between items-center mt-auto pt-2">
             <span className="font-bold">₹{product.price}</span>
             <Button
-              size="icon"
-              className={`h-8 w-8 rounded-full transition-all ${
-                addedProducts[product.id] 
-                  ? "bg-green-600 hover:bg-green-700" 
-                  : "bg-green-500 hover:bg-green-600"
-              }`}
-              onClick={(e) => {
-                e.preventDefault()
-                handleAddToCart(product)
-              }}
+              onClick={() => handleAddToCart(product)}
+              disabled={loadingProductId === product.id}
+              className={`w-full ${getButtonClass(pathname)}`}
             >
-              {addedProducts[product.id] ? (
-                <Check size={16} className="text-white" />
+              {loadingProductId === product.id ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
               ) : (
-                <Plus size={16} />
+                <>
+                  <Plus size={16} className="mr-1" />
+                  Add
+                </>
               )}
             </Button>
           </div>

@@ -1,8 +1,9 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
-import { onAuthStateChange, signOut } from "@/lib/firebase/auth"
+import { onAuthStateChange, signOut, getCurrentUser } from "@/lib/firebase/auth"
 import { useFirebase } from "./firebase-provider"
+import { getAuth, getRedirectResult } from "firebase/auth"
 
 interface User {
   uid: string
@@ -16,6 +17,7 @@ interface AuthContextType {
   user: User | null
   loading: boolean
   signOut: () => Promise<{ success: boolean; error?: any }>
+  refreshAuthState: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -24,6 +26,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const { isAuthInitialized, isLoading: firebaseLoading } = useFirebase()
+
+  // Function to manually refresh auth state
+  const refreshAuthState = () => {
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      setUser({
+        uid: currentUser.uid,
+        phoneNumber: currentUser.phoneNumber,
+        displayName: currentUser.displayName,
+        email: currentUser.email,
+        photoURL: currentUser.photoURL,
+      });
+    } else {
+      setUser(null);
+    }
+  };
+
+  // Check for redirect result from Google sign-in
+  useEffect(() => {
+    const checkRedirectResult = async () => {
+      if (typeof window !== "undefined" && isAuthInitialized && !firebaseLoading) {
+        try {
+          // Check if we're coming back from a redirect
+          const auth = getAuth();
+          const result = await getRedirectResult(auth);
+          
+          if (result && result.user) {
+            console.log("Detected redirect result, user signed in:", result.user.displayName);
+            setUser({
+              uid: result.user.uid,
+              phoneNumber: result.user.phoneNumber,
+              displayName: result.user.displayName,
+              email: result.user.email,
+              photoURL: result.user.photoURL,
+            });
+            
+            // Clear the redirect flag
+            sessionStorage.removeItem('auth_redirect_started');
+            
+            // Check if we need to redirect to checkout
+            const shouldRedirectToCheckout = localStorage.getItem("redirect_to_checkout");
+            if (shouldRedirectToCheckout === "true") {
+              localStorage.removeItem("redirect_to_checkout");
+              // Add a small delay to ensure auth state is updated
+              setTimeout(() => {
+                window.location.href = "/checkout";
+              }, 500);
+            }
+          }
+        } catch (error) {
+          console.error("Error checking redirect result:", error);
+        }
+      }
+    };
+    
+    checkRedirectResult();
+  }, [isAuthInitialized, firebaseLoading]);
 
   useEffect(() => {
     // Only run auth state change listener on client side and after Firebase Auth is initialized
@@ -131,11 +190,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: true }
     } else {
       // In production, use Firebase signOut
-      return signOut()
+      const result = await signOut();
+      if (result.success) {
+        // Force refresh the user state
+        setUser(null);
+      }
+      return result;
     }
   }
 
-  return <AuthContext.Provider value={{ user, loading, signOut: handleSignOut }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, loading, signOut: handleSignOut, refreshAuthState }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

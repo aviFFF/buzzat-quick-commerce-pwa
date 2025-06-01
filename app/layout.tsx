@@ -10,6 +10,7 @@ import Script from "next/script"
 import PincodeRequiredModal from "@/components/pincode-required-modal"
 // Import environment variables setup
 import "@/lib/env"
+import { isAdminOrVendorPage } from "@/lib/utils"
 
 // Remove Google font dependency
 const fontClass = "font-sans"
@@ -36,9 +37,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   // Check if the current path is admin or vendor
-  const isAdminOrVendor = typeof window !== 'undefined' && 
-    (window.location.pathname.startsWith('/admin') || 
-     window.location.pathname.startsWith('/vendor'));
+  const isAdminOrVendor = typeof window !== 'undefined' && isAdminOrVendorPage();
 
   return (
     <html lang="en" className="light" style={{ colorScheme: "light" }} suppressHydrationWarning>
@@ -54,9 +53,9 @@ export default function RootLayout({
                 <div className="block sm:hidden">
                   <BottomNav key="bottom-nav" />
                 </div>
+                <PincodeRequiredModal />
               </>
             )}
-            <PincodeRequiredModal />
           </Providers>
           <Toaster />
         </ThemeProvider>

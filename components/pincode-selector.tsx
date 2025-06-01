@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input"
 import { usePincode } from "@/lib/hooks/use-pincode"
 import { isPincodeServiceable } from "@/lib/firebase/firestore"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
+import { isAdminOrVendorPage, getButtonClass } from "@/lib/utils"
 
 interface PincodeSelectorProps {
   headerStyle?: boolean;
@@ -24,6 +25,15 @@ export default function PincodeSelector({ headerStyle = false }: PincodeSelector
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
   const [useCurrentLocation, setUseCurrentLocation] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
+  
+  // Check if on admin or vendor pages
+  const isAdminOrVendor = isAdminOrVendorPage(pathname)
+  
+  // Don't render on admin or vendor pages
+  if (isAdminOrVendor) {
+    return null
+  }
   
   // Update input pincode when pincode changes
   useEffect(() => {
@@ -261,10 +271,11 @@ export default function PincodeSelector({ headerStyle = false }: PincodeSelector
               </div>
               <Button
                 type="submit"
-                className="w-full bg-green-500 hover:bg-green-600"
-                disabled={inputPincode.length !== 6 || !/^\d+$/.test(inputPincode) || isChecking}
+                onClick={handleSubmit}
+                disabled={isLoading || !pincode || pincode.length !== 6}
+                className={`w-full ${getButtonClass(pathname)}`}
               >
-                {isChecking ? "Checking..." : "Continue"}
+                {isLoading ? "Checking..." : "Apply"}
               </Button>
             </form>
           </div>

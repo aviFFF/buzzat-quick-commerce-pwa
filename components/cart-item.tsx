@@ -4,6 +4,8 @@ import Image from "next/image"
 import { Plus, Minus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/hooks/use-cart"
+import { getButtonClass } from "@/lib/utils"
+import { usePathname } from "next/navigation"
 
 interface CartItemProps {
   id: string
@@ -16,6 +18,7 @@ interface CartItemProps {
 
 export default function CartItem({ id, name, price, unit, image, quantity }: CartItemProps) {
   const { updateQuantity, removeFromCart } = useCart()
+  const pathname = usePathname()
 
   const handleDecrease = () => {
     if (quantity === 1) {
@@ -61,15 +64,15 @@ export default function CartItem({ id, name, price, unit, image, quantity }: Car
               className="h-7 w-7 rounded-l-full p-0 hover:bg-gray-100"
               onClick={handleDecrease}
             >
-              <Minus size={14} className="text-green-600" />
+              <Minus size={14} className="text-orange-600" />
             </Button>
             <span className="w-6 text-center font-medium text-sm">{quantity}</span>
             <Button 
               size="icon" 
-              className="h-7 w-7 rounded-r-full p-0 bg-green-500 hover:bg-green-600"
+              className={`h-7 w-7 rounded-r-full p-0 ${getButtonClass(pathname)}`}
               onClick={handleIncrease}
             >
-              <Plus size={14} className="text-white" />
+              <Plus size={16} />
             </Button>
           </div>
         </div>
