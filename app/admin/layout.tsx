@@ -16,15 +16,26 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const isLoginPage = pathname === "/admin/login"
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const handleLogout = async () => {
-    const auth = getAuth()
     try {
-      await auth.signOut()
+      setIsLoggingOut(true)
+      const auth = getAuth()
+      
+      // First remove cookie to prevent redirect loops
       Cookies.remove("admin_session")
-      router.push("/admin/login")
+      
+      // Then sign out from Firebase
+      await auth.signOut()
+      
+      // Delay navigation slightly to ensure state updates complete
+      setTimeout(() => {
+        router.push("/admin/login")
+      }, 100)
     } catch (error) {
       console.error("Error signing out:", error)
+      setIsLoggingOut(false)
     }
   }
 
@@ -75,10 +86,20 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <div className="mt-auto pt-4">
             <button
               onClick={handleLogout}
-              className="flex items-center gap-3 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-md transition-colors w-full"
+              disabled={isLoggingOut}
+              className="flex items-center gap-3 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-md transition-colors w-full disabled:opacity-50"
             >
-              <LogOut size={18} />
-              <span>Logout</span>
+              {isLoggingOut ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent border-white"></div>
+                  <span>Logging out...</span>
+                </>
+              ) : (
+                <>
+                  <LogOut size={18} />
+                  <span>Logout</span>
+                </>
+              )}
             </button>
           </div>
         </aside>
@@ -116,8 +137,17 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </span>
               </Link>
             <div className="md:hidden">
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut size={18} />
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent border-current"></div>
+                ) : (
+                  <LogOut size={18} />
+                )}
               </Button>
               </div>
             </div>

@@ -36,6 +36,8 @@ export const uploadProductImage = async (file: File, vendorId: string, attempt =
     const fileName = `${timestamp}_${safeFileName}`;
     
     console.log(`Uploading image to Cloudinary (attempt ${attempt}/${MAX_RETRIES}): ${fileName}`);
+    console.log(`Using cloud name: ${cloudinaryConfig.cloudName}`);
+    console.log(`Using upload preset: ${cloudinaryConfig.uploadPreset}`);
     
     // Create form data for upload
     const formData = new FormData();
@@ -47,24 +49,33 @@ export const uploadProductImage = async (file: File, vendorId: string, attempt =
     // Add metadata
     formData.append('context', `vendorId=${vendorId}|originalName=${file.name}`);
     
-    console.log(`Uploading to Cloudinary with preset: ${cloudinaryConfig.uploadPreset}`);
-    
     // Upload to Cloudinary using their upload API
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`,
-      {
-        method: 'POST',
-        body: formData,
-      }
-    );
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`;
+    console.log(`Uploading to Cloudinary URL: ${uploadUrl}`);
+    
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+    });
     
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        errorData = { error: { message: errorText } };
+      }
+      
       console.error("Cloudinary API error:", errorData);
-      throw new Error(errorData.error?.message || 'Failed to upload to Cloudinary');
+      console.error("Response status:", response.status);
+      console.error("Response headers:", Object.fromEntries(response.headers.entries()));
+      
+      throw new Error(errorData.error?.message || `Failed to upload to Cloudinary (Status: ${response.status})`);
     }
     
     const data = await response.json();
+    console.log("Cloudinary upload successful:", data.secure_url);
     
     return { 
       success: true, 

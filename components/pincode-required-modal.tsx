@@ -1,21 +1,15 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { usePincode } from "@/lib/hooks/use-pincode"
 import { isPincodeServiceable } from "@/lib/firebase/firestore"
 import { useRouter } from "next/navigation"
 
-interface PincodeSelectorProps {
-  headerStyle?: boolean;
-}
-
-export default function PincodeSelector({ headerStyle = false }: PincodeSelectorProps) {
+export default function PincodeRequiredModal() {
   const { pincode, updatePincode, isLoading } = usePincode()
   const [inputPincode, setInputPincode] = useState("")
   const [open, setOpen] = useState(false)
@@ -24,15 +18,20 @@ export default function PincodeSelector({ headerStyle = false }: PincodeSelector
   const [isLoadingAddress, setIsLoadingAddress] = useState(false)
   const [useCurrentLocation, setUseCurrentLocation] = useState(false)
   const router = useRouter()
-  
-  // Update input pincode when pincode changes
+
+  // Show modal if no pincode is set
   useEffect(() => {
-    if (pincode) {
-      setInputPincode(pincode)
-      // Fetch address for the pincode
-      fetchAddressFromPincode(pincode)
+    if (!isLoading && !pincode) {
+      setOpen(true)
     }
-  }, [pincode])
+  }, [pincode, isLoading])
+
+  // Prevent closing the modal if no pincode is set
+  const handleOpenChange = (newOpen: boolean) => {
+    if (pincode || newOpen) {
+      setOpen(newOpen)
+    }
+  }
 
   // Fetch address from pincode using Google Maps API
   const fetchAddressFromPincode = async (pincode: string) => {
@@ -184,8 +183,8 @@ export default function PincodeSelector({ headerStyle = false }: PincodeSelector
       } catch (error) {
         console.error("Error checking pincode serviceability:", error)
         // On error, update pincode but don't reload
-      updatePincode(inputPincode)
-      setOpen(false)
+        updatePincode(inputPincode)
+        setOpen(false)
         router.refresh();
       } finally {
         setIsChecking(false)
@@ -194,82 +193,63 @@ export default function PincodeSelector({ headerStyle = false }: PincodeSelector
   }
 
   if (isLoading) {
-    return (
-      <div className={headerStyle ? "" : "py-4"}>
-        <Button variant="ghost" className="text-blue-600 p-0 h-auto font-normal" disabled>
-          <MapPin size={16} className="mr-1" />
-          <span>Loading...</span>
-        </Button>
-      </div>
-    )
+    return null; // Don't render anything while loading
   }
 
   return (
-    <div className={headerStyle ? "" : "py-4"}>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button variant="ghost" className={`text-blue-600 flex-col font-normal ${headerStyle ? "text-xs md:text-sm" : ""}`}>
-            <div className="flex items-center">
-              <MapPin size={headerStyle ? 14 : 16} className="mr-1" />
-              <span>Delivery to: </span>
-              <span className="font-medium ml-1">{pincode}</span>
-            </div>
-            {address && (
-              <span className="text-gray-600 text-xs truncate max-w-[200px] block mt-1">
-                {address.split(',').slice(0, 2).join(',')}
-              </span>
-            )}
-            <span className="font-medium text-green-600 block mt-1">Change Location</span>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} hideCloseButton={true}>
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-center">Select your delivery location</h2>
+          
+          <p className="text-sm text-gray-600">
+            Please select your delivery location to continue using the app.
+          </p>
+          
+          <Button 
+            type="button" 
+            variant="outline" 
+            className="w-full flex items-center justify-center gap-2 py-6"
+            onClick={getCurrentLocation}
+            disabled={useCurrentLocation || isLoadingAddress || isChecking}
+          >
+            <MapPin size={18} />
+            {isLoadingAddress ? "Getting location..." : isChecking ? "Checking serviceability..." : "Use current location"}
           </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enter your delivery location</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full flex items-center justify-center gap-2"
-              onClick={getCurrentLocation}
-              disabled={useCurrentLocation || isLoadingAddress || isChecking}
+          
+          {address && (
+            <div className="p-3 bg-gray-50 rounded-md">
+              <p className="text-sm font-medium">Delivery Address</p>
+              <p className="text-sm text-gray-600">{address}</p>
+            </div>
+          )}
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="pincode" className="text-sm font-medium block mb-1">Pincode</label>
+              <Input
+                id="pincode"
+                type="text"
+                placeholder="Enter 6-digit pincode"
+                value={inputPincode}
+                onChange={(e) => setInputPincode(e.target.value)}
+                maxLength={6}
+                pattern="[0-9]*"
+                inputMode="numeric"
+                autoFocus
+                className="py-6"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-green-400 hover:bg-green-500 py-6 text-white"
+              disabled={inputPincode.length !== 6 || !/^\d+$/.test(inputPincode) || isChecking}
             >
-              <MapPin size={16} />
-              {isLoadingAddress ? "Getting location..." : isChecking ? "Checking serviceability..." : "Use current location"}
+              {isChecking ? "Checking..." : "Continue"}
             </Button>
-            
-            {address && (
-              <div className="p-3 bg-gray-50 rounded-md">
-                <p className="text-sm font-medium">Delivery Address</p>
-                <p className="text-sm text-gray-600">{address}</p>
-              </div>
-            )}
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="pincode" className="text-sm font-medium block mb-1">Pincode</label>
-                <Input
-                  id="pincode"
-                  type="text"
-                  placeholder="Enter 6-digit pincode"
-                  value={inputPincode}
-                  onChange={(e) => setInputPincode(e.target.value)}
-                  maxLength={6}
-                  pattern="[0-9]*"
-                  inputMode="numeric"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full bg-green-500 hover:bg-green-600"
-                disabled={inputPincode.length !== 6 || !/^\d+$/.test(inputPincode) || isChecking}
-              >
-                {isChecking ? "Checking..." : "Continue"}
-              </Button>
-            </form>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </form>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
-}
+} 

@@ -1,8 +1,9 @@
 "use client"
 
-import { getAuth, signInWithPhoneNumber as firebaseSignInWithPhoneNumber, PhoneAuthProvider, signInWithCredential, RecaptchaVerifier, signOut as firebaseSignOut, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
+import { getAuth, signInWithPhoneNumber as firebaseSignInWithPhoneNumber, PhoneAuthProvider, signInWithCredential, RecaptchaVerifier, signOut as firebaseSignOut, GoogleAuthProvider, signInWithPopup, getRedirectResult, signInWithRedirect } from "firebase/auth"
 import { initializeFirebaseApp } from "./firebase-client"
 import { isAuthInitialized } from "./firebase-client"
+import { AUTH_CONFIG } from "./config"
 
 // Get auth instance
 const app = initializeFirebaseApp()
@@ -118,15 +119,76 @@ export async function signInWithGoogle() {
 
     // PRODUCTION: Use actual Firebase authentication
     const provider = new GoogleAuthProvider();
+    
+    // Add scopes if needed
+    provider.addScope('profile');
+    provider.addScope('email');
+    
+    // Always prompt for account selection for better UX
     provider.setCustomParameters({
       prompt: 'select_account'
     });
     
-    const result = await signInWithPopup(auth, provider);
-    console.log("User successfully authenticated with Google")
-    return { success: true, user: result.user }
-  } catch (error) {
-    console.error("Error signing in with Google:", error)
+    console.log("Initiating Google sign-in...");
+    
+    // First try with redirect method instead of popup
+    try {
+      console.log("Attempting sign-in with redirect...");
+      // Check if we're coming back from a redirect
+      const result = await getRedirectResult(auth);
+      
+      if (result) {
+        // User has been redirected back after authentication
+        console.log("User returned from redirect flow:", result.user.displayName);
+        return { 
+          success: true, 
+          user: result.user,
+        };
+      } else {
+        // Start the redirect flow
+        console.log("Starting redirect flow for authentication...");
+        await signInWithRedirect(auth, provider);
+        // This code won't execute as the page will redirect
+        return { success: true };
+      }
+    } catch (redirectError) {
+      console.error("Redirect sign-in failed, falling back to popup:", redirectError);
+      
+      // Fall back to popup method
+      console.log("Trying popup method instead...");
+      const result = await signInWithPopup(auth, provider);
+      
+      // Get the Google OAuth access token
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const token = credential?.accessToken;
+      
+      // The signed-in user info
+      const user = result.user;
+      
+      console.log("User successfully authenticated with Google:", user.displayName);
+      
+      return { 
+        success: true, 
+        user: result.user,
+        token: token
+      }
+    }
+  } catch (error: any) {
+    console.error("Error signing in with Google:", error);
+    
+    // Handle specific error cases
+    if (error.code === 'auth/popup-closed-by-user') {
+      return { 
+        success: false, 
+        error: new Error("Sign-in was cancelled. Please try again.")
+      };
+    } else if (error.code === 'auth/popup-blocked') {
+      return { 
+        success: false, 
+        error: new Error("Sign-in popup was blocked by your browser. Please allow popups for this site or try again in a new tab.")
+      };
+    }
+    
     return { success: false, error }
   }
 }
@@ -171,6 +233,50 @@ export async function signInWithPhoneNumber(phoneNumber: string, recaptchaVerifi
       }
       
       return { success: true, confirmationResult: mockConfirmationResult }
+    }
+
+    // Check OTP limit in production
+    if (!AUTH_CONFIG.ENABLE_PHONE_AUTH) {
+      console.error("Phone authentication is disabled in configuration");
+      return { 
+        success: false, 
+        error: new Error("Phone authentication is currently disabled. Please use Google Sign-In instead.")
+      };
+    }
+    
+    // Check daily OTP limit
+    if (typeof window !== "undefined") {
+      try {
+        // Get current date in YYYY-MM-DD format
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Get stored usage data
+        const storedData = localStorage.getItem(AUTH_CONFIG.OTP_USAGE_STORAGE_KEY);
+        let usageData = storedData ? JSON.parse(storedData) : { date: today, count: 0 };
+        
+        // Reset counter if it's a new day
+        if (usageData.date !== today) {
+          usageData = { date: today, count: 0 };
+        }
+        
+        // Check if limit is reached
+        if (usageData.count >= AUTH_CONFIG.DAILY_OTP_LIMIT) {
+          console.log(`OTP daily limit of ${AUTH_CONFIG.DAILY_OTP_LIMIT} reached`);
+          return { 
+            success: false, 
+            error: new Error(AUTH_CONFIG.OTP_LIMIT_MESSAGE)
+          };
+        }
+        
+        // Increment usage count
+        usageData.count += 1;
+        localStorage.setItem(AUTH_CONFIG.OTP_USAGE_STORAGE_KEY, JSON.stringify(usageData));
+        
+        console.log(`OTP usage: ${usageData.count}/${AUTH_CONFIG.DAILY_OTP_LIMIT} for today`);
+      } catch (error) {
+        console.error("Error checking OTP limit:", error);
+        // Continue even if there's an error with the limit checking
+      }
     }
 
     // PRODUCTION: Use actual Firebase authentication

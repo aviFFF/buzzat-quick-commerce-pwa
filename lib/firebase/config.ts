@@ -3,6 +3,18 @@ import { getAuth } from "firebase/auth"
 import { getFirestore } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
 
+// Authentication configuration
+export const AUTH_CONFIG = {
+  // Set this to false to disable phone authentication when daily limit is reached
+  ENABLE_PHONE_AUTH: true,
+  // Maximum number of OTP verifications allowed per day (Firebase free tier limit)
+  DAILY_OTP_LIMIT: 10,
+  // Key for storing OTP usage count in localStorage
+  OTP_USAGE_STORAGE_KEY: 'otp_daily_usage',
+  // Message to show when OTP limit is reached
+  OTP_LIMIT_MESSAGE: 'Daily OTP limit reached. Please use Google Sign-In instead.'
+}
+
 // Get environment variables for Firebase configuration
 const getFirebaseConfig = () => {
   // For client-side code, we need to access NEXT_PUBLIC_ variables

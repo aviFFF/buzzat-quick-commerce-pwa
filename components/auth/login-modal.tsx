@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { signInWithPhoneNumber, verifyOTP, initRecaptchaVerifier, signInWithGoogle } from "@/lib/firebase/auth"
 import { useFirebase } from "@/lib/context/firebase-provider"
 import { useRouter } from "next/navigation"
+import { AUTH_CONFIG } from "@/lib/firebase/config"
 
 export function LoginModal({ onClose }: { onClose: () => void }) {
   const [phoneNumber, setPhoneNumber] = useState("")
@@ -24,6 +25,8 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
   const { isAuthInitialized, isLoading: firebaseLoading } = useFirebase()
   const router = useRouter()
   const [recaptchaInitialized, setRecaptchaInitialized] = useState(false)
+  const [otpCount, setOtpCount] = useState<number>(0);
+  const [otpLimitReached, setOtpLimitReached] = useState<boolean>(false);
 
   // Cleanup any existing recaptcha elements when component mounts
   useEffect(() => {
@@ -86,6 +89,25 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
       return () => clearTimeout(timer);
     }
   }, [isAuthInitialized, recaptchaInitialized, firebaseLoading]);
+
+  // Check OTP usage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const storedData = localStorage.getItem(AUTH_CONFIG.OTP_USAGE_STORAGE_KEY);
+        if (storedData) {
+          const usageData = JSON.parse(storedData);
+          if (usageData.date === today) {
+            setOtpCount(usageData.count);
+            setOtpLimitReached(usageData.count >= AUTH_CONFIG.DAILY_OTP_LIMIT);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking OTP usage:", error);
+      }
+    }
+  }, []);
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,54 +248,16 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
 
         {step === "phone" ? (
           <>
-            <form onSubmit={handleSendOTP} className="space-y-4">
-              <div className="flex">
-                <div className="bg-gray-100 flex items-center px-3 rounded-l-md border border-r-0">
-                  <span className="text-gray-500">+91</span>
-                </div>
-                <Input
-                  type="tel"
-                  placeholder="Enter mobile number"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  className="rounded-l-none"
-                  maxLength={10}
-                  pattern="[0-9]*"
-                  inputMode="numeric"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-              <div id="recaptcha-container" ref={recaptchaContainerRef} className="invisible h-0"></div>
-              <Button
-                type="submit"
-                className="w-full bg-gray-300 text-gray-800 hover:bg-gray-400"
-                disabled={isLoading || phoneNumber.length !== 10 || !/^\d+$/.test(phoneNumber)}
-              >
-                {isLoading ? "Sending..." : "Continue"}
-              </Button>
-            </form>
-            
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-gray-300"></span>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500">Or continue with</span>
-              </div>
-            </div>
-            
             <Button
               type="button"
-              variant="outline"
-              className="w-full flex items-center justify-center gap-2"
+              className="w-full flex items-center justify-center gap-2 bg-white text-gray-800 hover:bg-gray-100 border border-gray-300 mb-4"
               onClick={handleGoogleSignIn}
               disabled={isGoogleLoading}
             >
               {isGoogleLoading ? (
-                <div className="animate-spin h-4 w-4 border-2 border-gray-500 rounded-full border-t-transparent"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500"></div>
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                   <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
@@ -283,8 +267,64 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
               <span>{isGoogleLoading ? "Signing in..." : "Sign in with Google"}</span>
             </Button>
             
+            {otpLimitReached ? (
+              <div className="bg-amber-50 text-amber-600 p-3 rounded-md text-sm mb-4">
+                Daily OTP limit reached. Please use Google Sign-In instead.
+              </div>
+            ) : (
+              <>
+                <div className="relative mb-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-gray-300"></span>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-2 bg-white text-gray-500">OR</span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSendOTP} className="space-y-4">
+                  <div className="flex">
+                    <div className="bg-gray-100 flex items-center px-3 rounded-l-md border border-r-0">
+                      <span className="text-gray-500">+91</span>
+                    </div>
+                    <Input
+                      type="tel"
+                      placeholder="Enter mobile number"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="rounded-l-none"
+                      maxLength={10}
+                      pattern="[0-9]*"
+                      inputMode="numeric"
+                      required
+                      disabled={isLoading || otpLimitReached}
+                    />
+                  </div>
+                  
+                  {otpCount > 0 && otpCount < AUTH_CONFIG.DAILY_OTP_LIMIT && (
+                    <div className="text-xs text-amber-600 text-center">
+                      {AUTH_CONFIG.DAILY_OTP_LIMIT - otpCount} OTP verifications remaining today
+                    </div>
+                  )}
+                  
+                  <div id="recaptcha-container" ref={recaptchaContainerRef} className="invisible h-0"></div>
+                  <Button
+                    type="submit"
+                    className="w-full bg-gray-300 text-gray-800 hover:bg-gray-400"
+                    disabled={isLoading || otpLimitReached}
+                  >
+                    {isLoading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-800"></div>
+                    ) : (
+                      "Continue with Phone"
+                    )}
+                  </Button>
+                </form>
+              </>
+            )}
+            
             <p className="text-xs text-center text-gray-500 mt-4">
-              By continuing, you agree to our Terms of service & Privacy policy
+              By continuing, you agree to our Terms of Service & Privacy Policy
             </p>
           </>
         ) : (

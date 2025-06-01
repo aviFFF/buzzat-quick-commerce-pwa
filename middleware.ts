@@ -18,9 +18,38 @@ export async function middleware(request: NextRequest) {
     }
   }
   
+  // Check for pincode cookie on main app routes
+  if (!pathname.startsWith("/admin") && 
+      !pathname.startsWith("/api") && 
+      !pathname.startsWith("/_next") && 
+      !pathname.startsWith("/favicon") &&
+      !pathname.includes(".") && // Skip static files
+      pathname !== "/coming-soon") {
+    
+    // Paths that don't need pincode verification
+    const exemptPaths = [
+      "/auth-debug",
+      "/terms",
+      "/privacy",
+      "/about"
+    ]
+    
+    if (!exemptPaths.includes(pathname)) {
+      // Check for pincode cookie
+      const pincode = request.cookies.get("user_pincode")
+      
+      // If no pincode, allow the page to load but the pincode selector will show
+      // The component will handle forcing the user to select a pincode
+      // We don't redirect here to avoid redirect loops
+    }
+  }
+  
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/((?!_next/static|_next/image|favicon.ico).*)"
+  ],
 } 

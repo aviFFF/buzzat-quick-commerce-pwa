@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner"
 import BottomNav from "@/components/bottom-nav"
 import Footer from "@/components/footer"
 import Script from "next/script"
+import PincodeRequiredModal from "@/components/pincode-required-modal"
 // Import environment variables setup
 import "@/lib/env"
 
@@ -34,6 +35,11 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Check if the current path is admin or vendor
+  const isAdminOrVendor = typeof window !== 'undefined' && 
+    (window.location.pathname.startsWith('/admin') || 
+     window.location.pathname.startsWith('/vendor'));
+
   return (
     <html lang="en" className="light" style={{ colorScheme: "light" }} suppressHydrationWarning>
       <body className={`${fontClass} min-h-screen flex flex-col`}>
@@ -42,14 +48,31 @@ export default function RootLayout({
             <div className="flex-grow">
               {children}
             </div>
-            <Footer />
-            <div className="block sm:hidden">
-              <BottomNav key="bottom-nav" />
-            </div>
+            {!isAdminOrVendor && (
+              <>
+                <Footer />
+                <div className="block sm:hidden">
+                  <BottomNav key="bottom-nav" />
+                </div>
+              </>
+            )}
+            <PincodeRequiredModal />
           </Providers>
           <Toaster />
         </ThemeProvider>
         <Script src="/service-worker-register.js" strategy="lazyOnload" />
+        {/* Script to detect admin/vendor paths on client side */}
+        <Script id="detect-admin-vendor" strategy="afterInteractive">
+          {`
+            function updateBodyClass() {
+              const isAdminOrVendor = window.location.pathname.startsWith('/admin') || 
+                                      window.location.pathname.startsWith('/vendor');
+              document.body.classList.toggle('admin-vendor-page', isAdminOrVendor);
+            }
+            updateBodyClass();
+            window.addEventListener('popstate', updateBodyClass);
+          `}
+        </Script>
       </body>
     </html>
   )
