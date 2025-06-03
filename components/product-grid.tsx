@@ -116,7 +116,7 @@ export default function ProductGrid({ category }: { category: string }) {
             <Button
               onClick={() => handleAddToCart(product)}
               disabled={loadingProductId === product.id}
-              className={`w-full ${getButtonClass(pathname)}`}
+              className={`p-4 ${getButtonClass(pathname ?? '')}`}
             >
               {loadingProductId === product.id ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
