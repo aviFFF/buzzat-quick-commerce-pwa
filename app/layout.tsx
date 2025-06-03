@@ -10,7 +10,7 @@ import Script from "next/script"
 import PincodeRequiredModal from "@/components/pincode-required-modal"
 // Import environment variables setup
 import "@/lib/env"
-import { isAdminOrVendorPage } from "@/lib/utils"
+import { shouldShowHeaderFooter } from "@/lib/utils"
 
 // Remove Google font dependency
 const fontClass = "font-sans"
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Buzzat",
   },
-  generator: 'v0.dev'
+  generator: 'buzzat'
 }
 
 export const viewport = {
@@ -36,8 +36,9 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Check if the current path is admin or vendor
-  const isAdminOrVendor = typeof window !== 'undefined' && isAdminOrVendorPage();
+  // We'll rely on client-side detection for header/footer visibility
+  // Server-side will show them by default, then client-side JS will adjust
+  const showHeaderFooter = true;
 
   return (
     <html lang="en" className="light" style={{ colorScheme: "light" }} suppressHydrationWarning>
@@ -47,29 +48,109 @@ export default function RootLayout({
             <div className="flex-grow">
               {children}
             </div>
-            {!isAdminOrVendor && (
-              <>
-                <Footer />
+            <div id="layout-footer-container" style={{display: 'block'}}>
+              <Footer data-footer="true" />
                 <div className="block sm:hidden">
-                  <BottomNav key="bottom-nav" />
+                <BottomNav key="bottom-nav" data-bottom-nav="true" />
+              </div>
+              <PincodeRequiredModal data-pincode-modal="true" />
                 </div>
-                <PincodeRequiredModal />
-              </>
-            )}
           </Providers>
           <Toaster />
         </ThemeProvider>
         <Script src="/service-worker-register.js" strategy="lazyOnload" />
-        {/* Script to detect admin/vendor paths on client side */}
-        <Script id="detect-admin-vendor" strategy="afterInteractive">
+        {/* Script to update header/footer visibility on client side */}
+        <Script id="update-layout" strategy="afterInteractive">
           {`
-            function updateBodyClass() {
-              const isAdminOrVendor = window.location.pathname.startsWith('/admin') || 
-                                      window.location.pathname.startsWith('/vendor');
-              document.body.classList.toggle('admin-vendor-page', isAdminOrVendor);
+            function updateLayoutVisibility() {
+              const pathname = window.location.pathname;
+              console.log("Checking layout visibility for path:", pathname);
+              
+              // Add appropriate class to body based on URL
+              if (pathname.includes('/admin')) {
+                document.body.classList.add('admin-page');
+                document.body.classList.remove('vendor-page');
+              } else if (pathname.includes('/vendor')) {
+                document.body.classList.add('vendor-page');
+                document.body.classList.remove('admin-page');
+              } else {
+                document.body.classList.remove('admin-page');
+                document.body.classList.remove('vendor-page');
+              }
+              
+              // Check for admin or vendor pages first
+              if (pathname.includes('/admin') || pathname.includes('/vendor')) {
+                console.log("Admin or vendor page detected, hiding elements");
+                hideElements();
+                return;
+              }
+              
+              // List of other paths that should NOT have header and footer
+              const noHeaderFooterPaths = ['/checkout', '/auth', '/payment-success', '/payment-failure'];
+              const shouldShow = !noHeaderFooterPaths.some(path => pathname.startsWith(path));
+              
+              console.log("Should show header/footer:", shouldShow);
+              
+              // Find footer and bottom nav elements
+              const footer = document.querySelector('[data-footer="true"]');
+              const bottomNav = document.querySelector('[data-bottom-nav="true"]');
+              const pincodeModal = document.querySelector('[data-pincode-modal="true"]');
+              
+              // Update visibility
+              if (footer) footer.style.display = shouldShow ? '' : 'none';
+              if (bottomNav) bottomNav.style.display = shouldShow ? '' : 'none';
+              if (pincodeModal) pincodeModal.style.display = shouldShow ? '' : 'none';
             }
-            updateBodyClass();
-            window.addEventListener('popstate', updateBodyClass);
+            
+            function hideElements() {
+              const footer = document.querySelector('[data-footer="true"]');
+              const bottomNav = document.querySelector('[data-bottom-nav="true"]');
+              const pincodeModal = document.querySelector('[data-pincode-modal="true"]');
+              
+              if (footer) footer.style.display = 'none';
+              if (bottomNav) bottomNav.style.display = 'none';
+              if (pincodeModal) pincodeModal.style.display = 'none';
+            }
+            
+            // Immediate check on script load - hide footer container if on admin/vendor pages
+            (function() {
+              const pathname = window.location.pathname;
+              if (pathname.includes('/admin')) {
+                document.body.classList.add('admin-page');
+              } else if (pathname.includes('/vendor')) {
+                document.body.classList.add('vendor-page');
+            }
+              
+              if (pathname.includes('/admin') || pathname.includes('/vendor')) {
+                const container = document.getElementById('layout-footer-container');
+                if (container) {
+                  container.style.display = 'none';
+                }
+              }
+            })();
+            
+            // Run on initial load
+            updateLayoutVisibility();
+            
+            // Listen for URL changes
+            window.addEventListener('popstate', updateLayoutVisibility);
+            
+            // For Next.js client-side navigation
+            const originalPushState = history.pushState;
+            const originalReplaceState = history.replaceState;
+            
+            history.pushState = function() {
+              originalPushState.apply(this, arguments);
+              updateLayoutVisibility();
+            };
+            
+            history.replaceState = function() {
+              originalReplaceState.apply(this, arguments);
+              updateLayoutVisibility();
+            };
+            
+            // Also check periodically in case we miss any navigation events
+            setInterval(updateLayoutVisibility, 1000);
           `}
         </Script>
       </body>

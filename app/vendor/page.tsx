@@ -146,7 +146,7 @@ export default function VendorDashboard() {
           return {
             id: doc.id,
             ...data
-          }
+          } as Order
         })
         
         // Process recent orders

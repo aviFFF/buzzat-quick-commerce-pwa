@@ -40,7 +40,7 @@ const CollapsibleSection = ({ title, children }: CollapsibleSectionProps) => {
   );
 };
 
-export default function Footer() {
+export default function Footer(props: React.HTMLAttributes<HTMLElement>) {
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const currentYear = new Date().getFullYear()
@@ -77,7 +77,7 @@ export default function Footer() {
   }, [])
 
   return (
-    <footer className="bg-gray-50 border-t pb-20 sm:pb-0">
+    <footer className="bg-gray-50 border-t pb-20 sm:pb-0" {...props}>
       <div className="container mx-auto px-4 py-6 md:py-10">
         {/* Logo and description - always visible */}
         {/* <div className="mb-6 md:mb-8">
