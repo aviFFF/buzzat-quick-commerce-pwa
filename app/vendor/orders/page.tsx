@@ -48,16 +48,18 @@ const ORDER_STATUS_LABELS = {
   cancelled: "Cancelled"
 }
 
+interface OrderItem {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 interface Order {
   id: string
   createdAt: Timestamp
   userId: string
-  items: Array<{
-    productId: string
-    name: string
-    price: number
-    quantity: number
-  }>
+  items: OrderItem[]
   totalAmount: number
   deliveryFee: number
   address: {
@@ -82,11 +84,13 @@ export default function VendorOrders() {
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const { toast } = useToast()
   const [newOrdersCount, setNewOrdersCount] = useState(0)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!vendor || !vendor.pincodes || vendor.pincodes.length === 0) return
 
     setLoading(true)
+    setError(null)
     
     // Get orders that match the vendor's pincodes
     const ordersQuery = query(
@@ -98,66 +102,107 @@ export default function VendorOrders() {
     const unsubscribe = onSnapshot(
       ordersQuery,
       (snapshot) => {
-        // Filter orders client-side based on pincode
-        const ordersData = snapshot.docs
-          .map(doc => {
-            const data = doc.data() as Order;
-            return {
-              id: doc.id,
-              ...data
-            };
-          })
-          .filter(order => {
-            // Check if order's pincode matches any of the vendor's pincodes
-            const orderPincode = order.address?.pincode;
-            return vendor.pincodes.includes(orderPincode);
+        try {
+          // Filter orders client-side based on pincode
+          const ordersData = snapshot.docs
+            .map(doc => {
+              try {
+                const data = doc.data();
+                const docId = doc.id;
+                
+                // Create a safe order object with defaults for missing values
+                return {
+                  id: docId,
+                  createdAt: data.createdAt || Timestamp.now(),
+                  userId: data.userId || "",
+                  items: Array.isArray(data.items) ? data.items.map(item => ({
+                    productId: item.productId || "",
+                    name: item.name || "Unknown Product",
+                    price: typeof item.price === 'number' ? item.price : 0,
+                    quantity: typeof item.quantity === 'number' ? item.quantity : 1
+                  })) : [],
+                  totalAmount: typeof data.totalAmount === 'number' ? data.totalAmount : 0,
+                  deliveryFee: typeof data.deliveryFee === 'number' ? data.deliveryFee : 0,
+                  address: {
+                    name: data.address?.name || "Unknown",
+                    phone: data.address?.phone || "",
+                    address: data.address?.address || "",
+                    pincode: data.address?.pincode || "",
+                    city: data.address?.city || ""
+                  },
+                  paymentMethod: data.paymentMethod || "cod",
+                  paymentStatus: data.paymentStatus || "pending",
+                  orderStatus: data.orderStatus || "pending"
+                } as Order;
+              } catch (err) {
+                console.error("Error processing order document:", err, doc.id);
+                return null;
+              }
+            })
+            .filter(order => order !== null) // Remove any orders that failed to process
+            .filter(order => {
+              // Check if order's pincode matches any of the vendor's pincodes
+              const orderPincode = order?.address?.pincode;
+              const vendorPincodes = vendor.pincodes || [];
+              return orderPincode && vendorPincodes.includes(orderPincode);
+            }) as Order[];
+
+          // Check for new orders in the last 5 minutes
+          const fiveMinutesAgo = new Date();
+          fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
+          
+          const newOrders = ordersData.filter(order => {
+            if (!order.createdAt) return false;
+            try {
+              const orderDate = order.createdAt.toDate();
+              return orderDate > fiveMinutesAgo && order.orderStatus === 'pending';
+            } catch (err) {
+              console.error("Error converting timestamp:", err);
+              return false;
+            }
           });
 
-        // Check for new orders in the last 5 minutes
-        const fiveMinutesAgo = new Date();
-        fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
-        
-        const newOrders = ordersData.filter(order => {
-          if (!order.createdAt) return false;
-          const orderDate = order.createdAt.toDate();
-          return orderDate > fiveMinutesAgo && order.orderStatus === 'pending';
-        });
-
-        // Show notification for new orders
-        if (newOrders.length > 0 && newOrders.length !== newOrdersCount) {
-          // Only show notification if the count changed
-          if (newOrdersCount > 0) {
-            const newOrderCount = newOrders.length - newOrdersCount;
-            
-            // Show toast notification
-            toast({
-              title: `${newOrderCount} New Order(s)!`,
-              description: "You have new orders that need attention.",
-              variant: "default",
-              duration: 5000,
-            });
-            
-            // Show browser notification and play sound
-            if (newOrderCount > 0) {
-              // Get the newest order
-              const newestOrder = newOrders[0];
-              const orderNumber = newestOrder.id.slice(0, 8).toUpperCase();
+          // Show notification for new orders
+          if (newOrders.length > 0 && newOrders.length !== newOrdersCount) {
+            // Only show notification if the count changed
+            if (newOrdersCount > 0) {
+              const newOrderCount = newOrders.length - newOrdersCount;
               
-              // Show notification
-              notificationService.showNewOrderNotification(
-                newestOrder.id,
-                orderNumber
-              );
+              // Show toast notification
+              toast({
+                title: `${newOrderCount} New Order(s)!`,
+                description: "You have new orders that need attention.",
+                variant: "default",
+                duration: 5000,
+              });
+              
+              // Show browser notification and play sound
+              if (newOrderCount > 0) {
+                // Get the newest order
+                const newestOrder = newOrders[0];
+                const orderNumber = newestOrder.id.slice(0, 8).toUpperCase();
+                
+                // Show notification
+                notificationService.showNewOrderNotification(
+                  newestOrder.id,
+                  orderNumber
+                );
+              }
             }
+            setNewOrdersCount(newOrders.length);
           }
-          setNewOrdersCount(newOrders.length);
-        }
 
-        setOrders(ordersData);
-        setLoading(false);
+          setOrders(ordersData);
+          setLoading(false);
+        } catch (error) {
+          console.error("Error processing orders:", error);
+          setError("Failed to process orders data. Please refresh the page.");
+          setLoading(false);
+        }
       },
       (error) => {
         console.error("Error fetching orders:", error);
+        setError("Failed to fetch orders. Please check your connection and refresh the page.");
         setLoading(false);
       }
     );
@@ -174,7 +219,11 @@ export default function VendorOrders() {
     : orders.filter(order => order.orderStatus === filterStatus)
 
   if (!vendor) {
-    return <div>Loading...</div>
+    return (
+      <div className="flex justify-center items-center h-64">
+        <p className="text-gray-500">Loading vendor information...</p>
+      </div>
+    )
   }
 
   return (
@@ -203,11 +252,19 @@ export default function VendorOrders() {
         </div>
       </div>
 
+      {error && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="p-4">
+            <p className="text-red-800">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Order List</CardTitle>
           <div className="text-sm text-muted-foreground">
-            Showing orders for pincodes: {vendor.pincodes.join(', ')}
+            Showing orders for pincodes: {(vendor.pincodes || []).join(', ')}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -236,9 +293,14 @@ export default function VendorOrders() {
                 </TableHeader>
                 <TableBody>
                   {filteredOrders.map((order) => {
-                    const formattedDate = order.createdAt?.toDate ?
-                      new Date(order.createdAt.toDate()).toLocaleDateString() :
-                      'Unknown date'
+                    let formattedDate = 'Unknown date';
+                    try {
+                      if (order.createdAt?.toDate) {
+                        formattedDate = new Date(order.createdAt.toDate()).toLocaleDateString();
+                      }
+                    } catch (err) {
+                      console.error("Error formatting date:", err);
+                    }
 
                     return (
                       <TableRow 
@@ -248,26 +310,27 @@ export default function VendorOrders() {
                       >
                         <TableCell className="font-medium">{order.id.slice(0, 8).toUpperCase()}</TableCell>
                         <TableCell>{formattedDate}</TableCell>
-                        <TableCell>{order.address?.name || '-'}</TableCell>
-                        <TableCell>{order.items?.length || 0}</TableCell>
-                        <TableCell>₹{order.totalAmount?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell>{order.address?.name || 'Unknown'}</TableCell>
+                        <TableCell>{Array.isArray(order.items) ? order.items.length : 0} items</TableCell>
+                        <TableCell>₹{(order.totalAmount || 0).toFixed(2)}</TableCell>
                         <TableCell>
-                          <Badge className={ORDER_STATUS_COLORS[order.orderStatus] || ""}>
-                            {ORDER_STATUS_LABELS[order.orderStatus] || order.orderStatus}
+                          <Badge className={`${ORDER_STATUS_COLORS[order.orderStatus] || 'bg-gray-100 text-gray-800'} px-2 py-1`}>
+                            {ORDER_STATUS_LABELS[order.orderStatus] || 'Unknown'}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={order.paymentStatus === "paid" ? "outline" : "destructive"} className={order.paymentStatus === "paid" ? "bg-green-100 text-green-800" : ""}>
-                            {order.paymentStatus || 'Unknown'}
+                          <Badge variant={order.paymentStatus === "paid" ? "outline" : "secondary"}>
+                            {order.paymentMethod === "cod" ? "COD" : "Online"} • 
+                            {order.paymentStatus === "paid" ? " Paid" : " Pending"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
+                          <Button 
+                            variant="ghost" 
                             size="sm"
                             onClick={(e) => {
-                              e.stopPropagation()
-                              handleOrderClick(order.id)
+                              e.stopPropagation();
+                              handleOrderClick(order.id);
                             }}
                           >
                             View

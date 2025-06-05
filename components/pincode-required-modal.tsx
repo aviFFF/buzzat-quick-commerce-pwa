@@ -10,7 +10,7 @@ import { isPincodeServiceable } from "@/lib/firebase/firestore"
 import { useRouter, usePathname } from "next/navigation"
 import { isAdminOrVendorPage, getButtonClass } from "@/lib/utils"
 
-export default function PincodeRequiredModal() {
+export default function PincodeRequiredModal(props: React.HTMLAttributes<HTMLDivElement>) {
   const { pincode, updatePincode, isLoading } = usePincode()
   const [inputPincode, setInputPincode] = useState("")
   const [open, setOpen] = useState(false)
@@ -207,7 +207,7 @@ export default function PincodeRequiredModal() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange} {...props}>
       <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} hideCloseButton={true}>
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-center">Select your delivery location</h2>

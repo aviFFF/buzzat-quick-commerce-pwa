@@ -55,7 +55,7 @@ export default function CategoryPage() {
           
           // If the URL doesn't contain the category name, redirect to the proper URL
           const expectedSlug = `${createSlug(currentCategory.name)}-${currentCategory.id}`;
-          if (slug !== expectedSlug && !pathname.includes(expectedSlug)) {
+          if (slug !== expectedSlug && !pathname?.includes(expectedSlug)) {
             router.replace(`/category/${expectedSlug}`, { scroll: false });
           }
         }
@@ -90,7 +90,7 @@ export default function CategoryPage() {
         <h1 className="text-2xl font-bold mb-6">{categoryName || slug}</h1>
         
         {/* Horizontal Category Scroller */}
-        <div className="mb-6 overflow-x-auto pb-2 hide-scrollbar">
+        <div className="mb-6 overflow-x-auto pb-2 md:hidden block hide-scrollbar">
           <div className="flex space-x-4">
             {categories.map((category) => {
               const categorySlug = `${createSlug(category.name)}-${category.id}`;

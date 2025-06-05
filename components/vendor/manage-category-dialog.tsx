@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { useState, useEffect } from "react"
+import { doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Plus, AlertTriangle } from "lucide-react"
+import { Loader2, Pencil, Trash2, AlertTriangle } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import {
   Dialog,
@@ -23,17 +23,47 @@ import { resolveApiUrl } from "@/lib/utils"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import Image from "next/image"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
-export default function AddCategoryDialog({ onSuccess }: { onSuccess?: () => void }) {
+interface Category {
+  id: string
+  name: string
+  icon: string
+  iconPublicId?: string
+}
+
+interface ManageCategoryDialogProps {
+  category: Category
+  onSuccess?: () => void
+}
+
+export default function ManageCategoryDialog({ category, onSuccess }: ManageCategoryDialogProps) {
   // Form states
-  const [newCategory, setNewCategory] = useState({ name: "", icon: "" })
+  const [categoryData, setCategoryData] = useState({ name: category.name, icon: category.icon })
   const [isUploading, setIsUploading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [uploadMethod, setUploadMethod] = useState<"file" | "url">("file")
   const [iconFile, setIconFile] = useState<File | null>(null)
   const [iconUrl, setIconUrl] = useState<string>("")
-  const [iconPreview, setIconPreview] = useState<string | null>(null)
+  const [iconPreview, setIconPreview] = useState<string | null>(category.icon)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Update local state if category prop changes
+    setCategoryData({ name: category.name, icon: category.icon })
+    setIconPreview(category.icon)
+  }, [category])
 
   // Handle icon file selection
   const handleIconFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,14 +104,15 @@ export default function AddCategoryDialog({ onSuccess }: { onSuccess?: () => voi
       // For preview, use proxy for external URLs to avoid CORS issues
       const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
       setIconPreview(proxyUrl)
-    } else {
-      setIconPreview(null)
+    } else if (!url) {
+      // If URL is cleared, show original icon
+      setIconPreview(category.icon)
     }
   }
 
-  // Add new category
-  const handleAddCategory = async () => {
-    if (!newCategory.name) {
+  // Update category
+  const handleUpdateCategory = async () => {
+    if (!categoryData.name) {
       toast({
         title: "Error",
         description: "Category name is required",
@@ -94,8 +125,8 @@ export default function AddCategoryDialog({ onSuccess }: { onSuccess?: () => voi
     setUploadError(null)
     
     try {
-      let finalIconUrl = ""
-      let iconPublicId = ""
+      let finalIconUrl = categoryData.icon
+      let iconPublicId = category.iconPublicId || ""
       
       // Handle icon based on upload method
       if (uploadMethod === 'file' && iconFile) {
@@ -130,7 +161,7 @@ export default function AddCategoryDialog({ onSuccess }: { onSuccess?: () => voi
             finalIconUrl = uploadResult.url || ""
             iconPublicId = uploadResult.public_id || uploadResult.path || ""
           } else {
-          throw new Error(uploadResult.errorMessage || "Failed to upload icon image")
+            throw new Error(uploadResult.errorMessage || "Failed to upload icon image")
           }
         }
       } else if (uploadMethod === 'url' && iconUrl) {
@@ -227,30 +258,21 @@ export default function AddCategoryDialog({ onSuccess }: { onSuccess?: () => voi
             })
           }
         }
-      } else {
-        // Use default icon if none provided
-        finalIconUrl = "/icons/grocery.svg"
       }
       
-      // Create category document
-      await addDoc(collection(db, "categories"), {
-        name: newCategory.name,
+      // Update category document
+      await updateDoc(doc(db, "categories", category.id), {
+        name: categoryData.name,
         icon: finalIconUrl,
         iconPublicId: iconPublicId,
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       })
       
-      // Reset form
-      setNewCategory({ name: "", icon: "" })
-      setIconFile(null)
-      setIconPreview(null)
-      setIconUrl("")
       setIsDialogOpen(false)
       
       toast({
         title: "Success",
-        description: "Category was added successfully"
+        description: "Category was updated successfully"
       })
       
       // Call the success callback
@@ -259,116 +281,173 @@ export default function AddCategoryDialog({ onSuccess }: { onSuccess?: () => voi
       }
       
     } catch (err: any) {
-      console.error("Error adding category:", err)
-      setUploadError(err.message || "Failed to add category")
+      console.error("Error updating category:", err)
+      setUploadError(err.message || "Failed to update category")
       toast({
         title: "Error",
-        description: `Failed to add category: ${err.message}`,
+        description: `Failed to update category: ${err.message}`,
         variant: "destructive"
       })
     } finally {
       setIsUploading(false)
     }
   }
+
+  // Delete category
+  const handleDeleteCategory = async () => {
+    setIsDeleting(true)
+    
+    try {
+      await deleteDoc(doc(db, "categories", category.id))
+      
+      setIsDeleteDialogOpen(false)
+      setIsDialogOpen(false)
+      
+      toast({
+        title: "Success",
+        description: "Category was deleted successfully"
+      })
+      
+      // Call the success callback
+      if (onSuccess) {
+        onSuccess()
+      }
+    } catch (err: any) {
+      console.error("Error deleting category:", err)
+      toast({
+        title: "Error",
+        description: `Failed to delete category: ${err.message}`,
+        variant: "destructive"
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
   
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" /> Add Category
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add New Category</DialogTitle>
-          <DialogDescription>
-            Create a new product category with name and icon.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="categoryName">Category Name</Label>
-            <Input
-              id="categoryName"
-              placeholder="e.g. Fruits & Vegetables"
-              value={newCategory.name}
-              onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
-            />
-          </div>
-          
-          {uploadError && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>{uploadError}</AlertDescription>
-            </Alert>
-          )}
-          
-          <Tabs defaultValue="file" onValueChange={(v) => setUploadMethod(v as "file" | "url")}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="file">Upload File</TabsTrigger>
-              <TabsTrigger value="url">Image URL</TabsTrigger>
-            </TabsList>
-            <TabsContent value="file" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="iconFile">Icon (Optional)</Label>
-                <Input
-                  id="iconFile"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleIconFileChange}
-                />
-                <p className="text-xs text-gray-500">Recommended size: 64x64px, Max: 2MB</p>
-              </div>
-              {iconPreview && (
-                <div className="mt-2 flex justify-center">
-                  <div className="relative h-20 w-20 overflow-hidden rounded border">
-                    <Image
-                      src={iconPreview}
-                      alt="Icon Preview"
-                      fill
-                      className="object-contain"
-                    />
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="url" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="iconUrl">Icon URL (Optional)</Label>
-                <Input
-                  id="iconUrl"
-                  type="url"
-                  placeholder="https://example.com/icon.png"
-                  value={iconUrl}
-                  onChange={(e) => handleIconUrlChange(e.target.value)}
-                />
-                <p className="text-xs text-gray-500">Enter a direct URL to an image</p>
-              </div>
-              {iconPreview && uploadMethod === 'url' && (
-                <div className="mt-2 flex justify-center">
-                  <div className="relative h-20 w-20 overflow-hidden rounded border">
-                    <Image
-                      src={iconPreview}
-                      alt="Icon Preview"
-                      fill
-                      className="object-contain"
-                    />
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button onClick={handleAddCategory} disabled={isUploading}>
-            {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-            {isUploading ? "Adding..." : "Add Category"}
+    <>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="icon">
+            <Pencil className="h-4 w-4" />
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Category</DialogTitle>
+            <DialogDescription>
+              Update the category name and icon.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="categoryName">Category Name</Label>
+              <Input
+                id="categoryName"
+                placeholder="e.g. Fruits & Vegetables"
+                value={categoryData.name}
+                onChange={(e) => setCategoryData({ ...categoryData, name: e.target.value })}
+              />
+            </div>
+            
+            {uploadError && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{uploadError}</AlertDescription>
+              </Alert>
+            )}
+            
+            <div className="flex justify-center mb-4">
+              <div className="relative h-20 w-20 overflow-hidden rounded border">
+                <Image
+                  src={iconPreview || "/icons/grocery.svg"}
+                  alt="Current Icon"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+            </div>
+            
+            <Tabs defaultValue="file" onValueChange={(v) => setUploadMethod(v as "file" | "url")}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="file">Upload New File</TabsTrigger>
+                <TabsTrigger value="url">New Image URL</TabsTrigger>
+              </TabsList>
+              <TabsContent value="file" className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="iconFile">New Icon (Optional)</Label>
+                  <Input
+                    id="iconFile"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleIconFileChange}
+                  />
+                  <p className="text-xs text-gray-500">Recommended size: 64x64px, Max: 2MB</p>
+                </div>
+              </TabsContent>
+              <TabsContent value="url" className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="iconUrl">New Icon URL (Optional)</Label>
+                  <Input
+                    id="iconUrl"
+                    type="url"
+                    placeholder="https://example.com/icon.png"
+                    value={iconUrl}
+                    onChange={(e) => handleIconUrlChange(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500">Enter a direct URL to an image</p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+          <DialogFooter className="flex justify-between">
+            <div className="flex items-center">
+              <Button 
+                variant="destructive" 
+                onClick={() => setIsDeleteDialogOpen(true)}
+                disabled={isUploading || isDeleting}
+              >
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                Delete
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <DialogClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DialogClose>
+              <Button onClick={handleUpdateCategory} disabled={isUploading}>
+                {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pencil className="mr-2 h-4 w-4" />}
+                {isUploading ? "Updating..." : "Update"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the category "{category.name}". This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteCategory();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isDeleting ? "Deleting..." : "Delete Category"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 } 

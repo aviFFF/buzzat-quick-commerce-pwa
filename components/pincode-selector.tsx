@@ -27,7 +27,7 @@ export default function PincodeSelector({ headerStyle = false }: PincodeSelector
   const router = useRouter()
   const pathname = usePathname()
   
-  // Check if on admin or vendor pages
+  // Check if on admin or vendor pages - do this check early
   const isAdminOrVendor = isAdminOrVendorPage(pathname)
   
   // Don't render on admin or vendor pages

@@ -260,7 +260,35 @@ export function VendorForm({ vendor, onSuccess, onCancel }: VendorFormProps) {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
+              disabled={!!vendor}
             />
+            {vendor && <p className="text-xs text-gray-500">Email cannot be changed after creation</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input
+              id="phone"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="pincodes" className="flex items-center">
+              <span>Delivery Areas (Pincodes)</span>
+              <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">Admin Only</span>
+            </Label>
+            <Textarea
+              id="pincodes"
+              value={formData.pincodes}
+              onChange={(e) => setFormData({ ...formData, pincodes: e.target.value })}
+              placeholder="Enter pincodes separated by commas (e.g. 110001, 110002)"
+            />
+            <p className="text-xs text-gray-500">
+              These pincodes define the areas where this vendor can deliver. Vendors cannot modify these themselves.
+            </p>
           </div>
 
           {!vendor && (
@@ -273,48 +301,19 @@ export function VendorForm({ vendor, onSuccess, onCancel }: VendorFormProps) {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required={!vendor}
-                  minLength={6}
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  className="absolute right-0 top-0 h-full px-3"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-500" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-500" />
-                  )}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
           )}
-
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="pincodes">Delivery Areas (comma-separated pincodes)</Label>
-            <Textarea
-              id="pincodes"
-              value={formData.pincodes}
-              onChange={(e) => setFormData({ ...formData, pincodes: e.target.value })}
-              placeholder="110001, 110002, 110003"
-              required
-            />
-            <p className="text-xs text-gray-500">
-              These are the areas where this vendor can deliver products. Vendors will only be able to make their products available in these pincodes.
-            </p>
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="deliveryMessage">Delivery Message</Label>

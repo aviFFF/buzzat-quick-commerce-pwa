@@ -12,6 +12,11 @@ const isFirebaseConfigValid = () => {
   );
 };
 
+// Check if Firebase Storage is properly configured
+const isFirebaseStorageConfigured = () => {
+  return !!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+};
+
 // Log a warning if Firebase config is missing
 if (typeof window !== 'undefined' && !isFirebaseConfigValid()) {
   console.error(
@@ -20,6 +25,16 @@ if (typeof window !== 'undefined' && !isFirebaseConfigValid()) {
       apiKey: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
       authDomain: !!process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
       projectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    }
+  );
+}
+
+// Log a warning if Firebase Storage bucket is missing
+if (typeof window !== 'undefined' && !isFirebaseStorageConfigured()) {
+  console.error(
+    "Firebase Storage bucket is not configured. File uploads will not work.",
+    {
+      storageBucket: !!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     }
   );
 }
@@ -64,6 +79,11 @@ try {
     auth = getAuth(app)
     db = getFirestore(app)
     storage = getStorage(app)
+    
+    // Log storage bucket information
+    if (typeof window !== 'undefined' && app) {
+      console.log("Firebase Storage bucket:", app.options.storageBucket || 'Not configured');
+    }
   } else {
     throw new Error("Firebase configuration is invalid. Please check your environment variables.")
   }
@@ -81,4 +101,4 @@ try {
 //   connectStorageEmulator(storage, 'localhost', 9199)
 // }
 
-export { app, auth, db, storage }
+export { app, auth, db, storage, isFirebaseStorageConfigured }

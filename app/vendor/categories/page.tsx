@@ -13,6 +13,8 @@ import { AlertCircle, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import AddCategoryDialog from "@/components/vendor/add-category-dialog"
+import ManageCategoryDialog from "@/components/vendor/manage-category-dialog"
+import ImportCategoriesDialog from "@/components/vendor/import-categories-dialog"
 import Image from "next/image"
 
 interface Category {
@@ -26,6 +28,7 @@ interface DbCategory {
   id: string
   name: string
   icon: string
+  iconPublicId?: string
 }
 
 interface Product {
@@ -42,6 +45,7 @@ export default function VendorCategoriesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedPincode, setSelectedPincode] = useState<string>("")
+  const [searchTerm, setSearchTerm] = useState<string>("")
 
   // Fetch categories for this vendor based on pincode
   useEffect(() => {
@@ -124,6 +128,13 @@ export default function VendorCategoriesPage() {
     ? categories.filter(category => category.pincodes.includes(selectedPincode))
     : categories
 
+  // Filter global categories based on search term
+  const filteredDbCategories = searchTerm
+    ? dbCategories.filter(category => 
+        category.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : dbCategories
+
   // Handler to refresh data after adding a new category
   const handleCategoryAdded = () => {
     if (vendor) {
@@ -158,7 +169,10 @@ export default function VendorCategoriesPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Categories</h1>
-        <AddCategoryDialog onSuccess={handleCategoryAdded} />
+        <div className="flex gap-2">
+          <ImportCategoriesDialog onSuccess={handleCategoryAdded} />
+          <AddCategoryDialog onSuccess={handleCategoryAdded} />
+        </div>
       </div>
 
       {error && (
@@ -251,24 +265,51 @@ export default function VendorCategoriesPage() {
           </div>
         )}
         
-        <h2 className="text-xl font-semibold mt-8">All Available Categories</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-4">
-          {dbCategories.map((category) => (
-            <div key={category.id} className="flex flex-col items-center p-4 bg-white rounded-lg shadow-sm">
-              <div className="flex flex-col items-center">
-                <div className="relative w-16 h-16 mb-2">
-                  <Image 
-                    src={category.icon || "/logo.webp"} 
-                    alt={category.name} 
-                    width={64} 
-                    height={64} 
-                    className="object-contain" 
-                  />
-                </div>
-                <span className="text-sm text-center font-medium text-gray-800">{category.name}</span>
-              </div>
+        <div className="pt-8 space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">All Available Categories</h2>
+            <div className="max-w-xs">
+              <Input
+                placeholder="Search categories..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+              />
             </div>
-          ))}
+          </div>
+          
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+            </div>
+          ) : filteredDbCategories.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {filteredDbCategories.map((category) => (
+                <div key={category.id} className="flex flex-col items-center p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex flex-col items-center">
+                    <div className="relative w-16 h-16 mb-2">
+                      <Image 
+                        src={category.icon || "/icons/grocery.svg"} 
+                        alt={category.name} 
+                        width={64} 
+                        height={64} 
+                        className="object-contain" 
+                      />
+                    </div>
+                    <span className="text-sm text-center font-medium text-gray-800 mb-2">{category.name}</span>
+                    <ManageCategoryDialog 
+                      category={category} 
+                      onSuccess={handleCategoryAdded} 
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-gray-500">
+              No categories found matching your search.
+            </div>
+          )}
         </div>
       </div>
     </div>

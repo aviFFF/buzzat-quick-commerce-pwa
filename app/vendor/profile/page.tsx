@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
-import { AlertCircle, CheckCircle, Loader2 } from "lucide-react"
+import { AlertCircle, CheckCircle, Loader2, Info } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function VendorProfilePage() {
@@ -72,7 +72,6 @@ export default function VendorProfilePage() {
       await updateDoc(doc(db, "vendors", vendor.id), {
         name: formData.name,
         address: formData.address,
-        pincode: formData.pincode,
         fssai: formData.fssai,
         gstin: formData.gstin,
         isOpen: formData.isOpen
@@ -167,9 +166,9 @@ export default function VendorProfilePage() {
                   id="pincode"
                   name="pincode"
                   value={formData.pincode}
-                  onChange={handleChange}
-                  required
+                  disabled // Pincode cannot be changed
                 />
+                <p className="text-xs text-gray-500">Pincode cannot be changed</p>
               </div>
             </div>
 
@@ -185,21 +184,20 @@ export default function VendorProfilePage() {
               />
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <Label htmlFor="delivery-areas" className="mb-2 block">Delivery Areas</Label>
-                <div className="text-sm text-gray-600 flex items-center gap-2">
-                  <span>
+            <Alert className="bg-blue-50 mt-4">
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium">Delivery Areas</span>
+                  <span className="text-sm">
                     {vendor.pincodes?.length ?
-                      `${vendor.pincodes.length} delivery areas selected` :
-                      "No delivery areas set"}
+                      `Your store serves ${vendor.pincodes.length} delivery areas: ${vendor.pincodes.join(', ')}` :
+                      "No delivery areas assigned to your store yet"}
                   </span>
+                  <span className="text-xs italic mt-1">Delivery areas are managed by the administrator. Contact support to update your delivery areas.</span>
                 </div>
-              </div>
-              <Button variant="outline" asChild className="mt-auto">
-                <a href="/vendor/profile/pincodes">Manage Delivery Areas</a>
-              </Button>
-            </div>
+              </AlertDescription>
+            </Alert>
           </CardContent>
         </Card>
 
@@ -249,9 +247,15 @@ export default function VendorProfilePage() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-end">
-            <Button onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Save Changes
+            <Button type="submit" onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </CardFooter>
         </Card>

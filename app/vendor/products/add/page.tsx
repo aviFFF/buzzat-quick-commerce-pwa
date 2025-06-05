@@ -19,6 +19,7 @@ import { toast } from "@/components/ui/use-toast"
 import Image from "next/image"
 import { collection, getDocs, orderBy, query } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
+import { resolveApiUrl } from "@/lib/utils"
 
 interface Category {
   id: string
@@ -206,25 +207,38 @@ export default function AddProductPage() {
 
   // Check upload configuration on component mount
   useEffect(() => {
-    checkConfig()
-  }, [])
-
-  // Function to check upload configuration
-  const checkConfig = async () => {
-    try {
-      const configStatus = await checkUploadConfig()
-      console.log("Upload configuration status:", configStatus)
-      
-      if (!configStatus.firebase.configured && !configStatus.cloudinary.configured) {
-        setError("Image upload services are not properly configured. Please contact the administrator.")
+    const checkUploadServices = async () => {
+      setIsConfigChecking(true);
+      try {
+        const uploadConfig = await checkUploadConfig();
+        
+        // Check specifically for Firebase Storage bucket configuration
+        if (uploadConfig.firebase && !uploadConfig.firebase.bucketConfigured) {
+          setConfigError("Firebase Storage bucket is not configured. Please use the URL option to add product images.");
+          // Automatically switch to URL mode if file uploads won't work
+          setImageUploadMode('url');
+        } else if (!uploadConfig.firebase.configured && !uploadConfig.cloudinary.configured) {
+          setConfigError("Warning: Image upload services are not properly configured. Please use the URL option to add product images.");
+          // Automatically switch to URL mode if file uploads won't work
+          setImageUploadMode('url');
       } else {
+          // Clear any previous error
+          setConfigError(null);
         // Show which service is being used
-        console.log(`Using ${configStatus.primaryService} as primary upload service`)
+          console.log(`Using ${uploadConfig.primaryService} as primary upload service`);
       }
     } catch (err) {
-      console.error("Error checking upload configuration:", err)
-    }
-  }
+        console.error("Error checking upload configuration:", err);
+        setConfigError("Could not verify upload service configuration. You may have better results using the URL option for images.");
+        // Automatically switch to URL mode if there's an error checking config
+        setImageUploadMode('url');
+      } finally {
+        setIsConfigChecking(false);
+      }
+    };
+    
+    checkUploadServices();
+  }, []);
 
   // Add a function to handle primary image URL input
   const handlePrimaryImageUrl = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -290,8 +304,6 @@ export default function AddProductPage() {
     setAdditionalImagePreviews(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Modify the handleSubmit function to use URL uploads when in URL mode
-  // Inside handleSubmit, replace the image upload section with this:
   // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -326,44 +338,166 @@ export default function AddProductPage() {
         return
       }
       
-      // Check if Cloudinary is configured
-      if (!isCloudinaryConfigured()) {
-        setError("Cloudinary is not properly configured. Please contact the administrator.")
-        setIsSubmitting(false)
-        return
-      }
-      
       let productImageUrl = ""
       let productImageId = ""
-      let additionalImageResults: string[] = []
-      let additionalImageIds: string[] = []
+      let additionalImageResults: Array<{
+        url: string;
+        path?: string;
+        public_id?: string;
+      }> = [];
       
-      // 1. Upload primary image
+      // Check upload configuration - but don't block submission if it fails
+      const uploadConfig = await checkUploadConfig().catch(() => ({
+        cloudinary: { configured: false },
+        firebase: { configured: false },
+        primaryService: 'firebase'
+      }));
+      
       setUploadProgress(10)
       
+      // Handle image uploads based on configuration status
+      if (uploadConfig.firebase.configured || uploadConfig.cloudinary.configured) {
+        // At least one service is configured, try to use it
       if (imageUploadMode === 'file' && primaryImage) {
-        // Upload file using unified service
-        const imageUploadResult = await uploadProductImage(primaryImage, vendor?.id || 'unknown')
-        
-        if (!imageUploadResult.success) {
-          throw new Error(`Failed to upload primary image: ${imageUploadResult.errorMessage}`)
-        }
-        
-        productImageUrl = imageUploadResult.url || ""
-        productImageId = imageUploadResult.public_id || imageUploadResult.path || ""
+          // Try server-side upload first to avoid CORS issues
+          try {
+            const formData = new FormData();
+            formData.append('file', primaryImage);
+            formData.append('vendorId', vendor?.id || 'unknown');
+            
+            console.log("Attempting server-side upload...");
+            const apiUrl = resolveApiUrl('/api/firebase/upload');
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+              console.log("Server-side upload successful");
+              productImageUrl = result.url || "";
+              productImageId = result.path || "";
+            } else {
+              console.error("Server-side upload failed with error:", result.error);
+              
+              // Check for specific bucket configuration issues
+              if (result.errorCode === 'storage/bucket-not-found' || 
+                  (result.errorCode === 'storage/unknown' && result.error?.includes('bucket'))) {
+                console.log("Firebase bucket configuration issue detected, using data URL directly");
+                const reader = new FileReader();
+                productImageUrl = await new Promise<string>((resolve) => {
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.readAsDataURL(primaryImage);
+                });
+                
+                toast({
+                  title: "Storage Configuration Issue",
+                  description: "Using embedded image data due to storage configuration issues.",
+                  variant: "destructive"
+                });
+                
+                // Skip further upload attempts
+                throw new Error("Firebase bucket not configured properly");
+              } else {
+                // For other errors, try client-side upload
+                throw new Error(result.error || "Server-side upload failed");
+              }
+            }
+          } catch (serverError) {
+            console.error("Server-side upload failed, falling back to client-side:", serverError);
+            
+            // Skip client-side upload if we already used data URL due to bucket issues
+            if (productImageUrl && productImageUrl.startsWith('data:')) {
+              console.log("Already using data URL, skipping client-side upload");
+            } else {
+              // Fall back to client-side upload
+              try {
+                const imageUploadResult = await uploadProductImage(primaryImage, vendor?.id || 'unknown');
+                
+                if (imageUploadResult.success) {
+                  console.log("Client-side upload successful");
+                  productImageUrl = imageUploadResult.url || "";
+                  productImageId = imageUploadResult.public_id || imageUploadResult.path || "";
+                } else {
+                  console.error("Client-side upload failed, falling back to data URL");
+                  throw new Error(`Client-side upload failed: ${imageUploadResult.errorMessage}`);
+                }
+              } catch (clientError) {
+                // Last resort: Use data URL
+                console.log("All upload methods failed, using data URL as fallback");
+                const reader = new FileReader();
+                productImageUrl = await new Promise<string>((resolve) => {
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.readAsDataURL(primaryImage);
+                });
+                toast({
+                  title: "Limited Upload Mode",
+                  description: "Using embedded image data. This may affect performance.",
+                  variant: "destructive"
+                });
+              }
+            }
+          }
       } else if (imageUploadMode === 'url' && primaryImageUrl) {
         // Upload from URL using unified service
         try {
-          const imageUploadResult = await uploadImageFromUrl(primaryImageUrl, vendor?.id || 'unknown');
-          
-          if (!imageUploadResult.success) {
-            throw new Error(`Failed to upload from URL: ${imageUploadResult.errorMessage}`);
-          }
-          
+            console.log("Attempting to upload from URL:", primaryImageUrl);
+            
+            // First try server-side upload
+            try {
+              const apiUrl = resolveApiUrl('/api/upload');
+              const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  imageUrl: primaryImageUrl,
+                  vendorId: vendor?.id || 'unknown'
+                })
+              });
+              
+              const result = await response.json();
+              
+              if (result.success) {
+                console.log("Server-side URL upload successful");
+                productImageUrl = result.url || "";
+                productImageId = result.path || result.public_id || "";
+              } else {
+                console.error("Server-side URL upload failed:", result.error);
+                throw new Error(result.error || "Server-side URL upload failed");
+              }
+            } catch (serverError) {
+              console.error("Server-side URL upload failed, trying client-side:", serverError);
+              
+              // Fall back to client-side upload
+              const imageUploadResult = await uploadImageFromUrl(primaryImageUrl, vendor?.id || 'unknown');
+              
+              if (imageUploadResult.success) {
+                console.log("Client-side URL upload successful");
           productImageUrl = imageUploadResult.url || "";
           productImageId = imageUploadResult.public_id || imageUploadResult.path || "";
+              } else {
+                // If both server and client-side uploads fail, use the URL directly
+                console.log("All upload methods failed, using URL directly");
+                productImageUrl = primaryImageUrl;
+                toast({
+                  title: "Limited Upload Mode",
+                  description: "Using direct image URL. This may affect performance if the source becomes unavailable.",
+                  variant: "destructive"
+                });
+              }
+            }
         } catch (error: any) {
-          throw new Error(`Failed to upload from URL: ${error.message}`);
+            console.error("Error uploading from URL:", error);
+            // Use the URL directly as a fallback
+            productImageUrl = primaryImageUrl;
+            toast({
+              title: "Upload Error",
+              description: "Using direct image URL due to upload error.",
+              variant: "destructive"
+            });
         }
       }
       
@@ -371,39 +505,196 @@ export default function AddProductPage() {
       setUploadProgress(50)
       
       if (imageUploadMode === 'file' && additionalImages.length > 0) {
-        // Upload additional files using unified service
-        const additionalUploadsResult = await uploadMultipleProductImages(
-          additionalImages, 
-          vendor?.id || 'unknown',
-          (progress) => {
-            // Convert to overall progress (50-80%)
-            setUploadProgress(50 + (progress * 0.3))
-          }
-        )
-        
-        if (additionalUploadsResult.success) {
-          additionalImageResults = additionalUploadsResult.results
-            .filter(r => r.success)
-            .map(r => r.url || "")
+          // Upload additional files using server-side API
+          const additionalImagePromises = additionalImages.map(async (file) => {
+            try {
+              const formData = new FormData();
+              formData.append('file', file);
+              formData.append('vendorId', vendor?.id || 'unknown');
+              
+              const apiUrl = resolveApiUrl('/api/firebase/upload');
+              const response = await fetch(apiUrl, {
+                method: 'POST',
+                body: formData
+              });
+              
+              const result = await response.json();
+              
+              if (result.success) {
+                console.log(`Additional image ${file.name} uploaded successfully via server API`);
+                return {
+                  success: true,
+                  url: result.url,
+                  path: result.path
+                };
+              } else {
+                console.error(`Failed to upload additional image ${file.name} via server API:`, result.error);
+                
+                // Check for bucket configuration issues
+                if (result.errorCode === 'storage/bucket-not-found' || 
+                    (result.errorCode === 'storage/unknown' && result.error?.includes('bucket'))) {
+                  console.log(`Firebase bucket issue detected for ${file.name}, using data URL directly`);
+                  const reader = new FileReader();
+                  const dataUrl = await new Promise<string>((resolve) => {
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.readAsDataURL(file);
+                  });
+                  
+                  return {
+                    success: true,
+                    url: dataUrl
+                  };
+                }
+                
+                // Try client-side upload for other errors
+                const clientResult = await uploadProductImage(file, vendor?.id || 'unknown');
+                
+                if (clientResult.success) {
+                  console.log(`Additional image ${file.name} uploaded successfully via client-side API`);
+                  return {
+                    success: true,
+                    url: clientResult.url || "",
+                    path: clientResult.path,
+                    public_id: clientResult.public_id
+                  };
+                }
+                
+                // If client-side also fails, use data URL
+                console.log(`Using data URL for additional image ${file.name}`);
+                const reader = new FileReader();
+                const dataUrl = await new Promise<string>((resolve) => {
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.readAsDataURL(file);
+                });
+                
+                return {
+                  success: true,
+                  url: dataUrl
+                };
+              }
+            } catch (error) {
+              console.error('Error uploading additional image:', error);
+              
+              // Use data URL as last resort
+              try {
+                console.log(`Using data URL as fallback for additional image ${file.name}`);
+                const reader = new FileReader();
+                const dataUrl = await new Promise<string>((resolve) => {
+                  reader.onload = () => resolve(reader.result as string);
+                  reader.readAsDataURL(file);
+                });
+                
+                return {
+                  success: true,
+                  url: dataUrl
+                };
+              } catch (dataUrlError) {
+                console.error('Failed to create data URL:', dataUrlError);
+                return { success: false };
+              }
+            }
+          });
           
-          additionalImageIds = additionalUploadsResult.results
+          // Wait for all uploads to complete
+          const results = await Promise.all(additionalImagePromises);
+          
+          // Filter successful uploads and map to the expected format
+          additionalImageResults = results
             .filter(r => r.success)
-            .map(r => r.public_id || r.path || "")
-        }
+            .map(r => ({
+              url: r.url || "",
+              path: r.path
+            }));
+            
+          // Update progress
+          setUploadProgress(80);
       } else if (imageUploadMode === 'url' && additionalImageUrls.length > 0) {
         // Upload additional URLs using unified service
         for (const url of additionalImageUrls.filter(url => url.trim())) {
           try {
+              console.log(`Attempting to upload additional image from URL: ${url}`);
+              
+              // Try server-side upload first
+              try {
+                const apiUrl = resolveApiUrl('/api/upload');
+                const response = await fetch(apiUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    imageUrl: url,
+                    vendorId: vendor?.id || 'unknown'
+                  })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                  console.log("Server-side additional URL upload successful");
+                  additionalImageResults.push({
+                    url: result.url || "",
+                    path: result.path,
+                    public_id: result.public_id
+                  });
+                } else {
+                  throw new Error(result.error || "Server-side additional URL upload failed");
+                }
+              } catch (serverError) {
+                console.error(`Server-side upload failed for additional URL: ${url}`, serverError);
+                
+                // Fall back to client-side upload
             const imageUploadResult = await uploadImageFromUrl(url, vendor?.id || 'unknown');
             
             if (imageUploadResult.success) {
-              additionalImageResults.push(imageUploadResult.url || "");
-              additionalImageIds.push(imageUploadResult.public_id || imageUploadResult.path || "");
+                  additionalImageResults.push({
+                    url: imageUploadResult.url || "",
+                    path: imageUploadResult.path,
+                    public_id: imageUploadResult.public_id
+                  });
             } else {
+                  // Use the URL directly as a fallback
+                  additionalImageResults.push({ url });
               console.error('Failed to upload additional image from URL:', imageUploadResult.errorMessage);
+                }
             }
           } catch (error) {
             console.error('Error uploading additional image from URL:', error);
+              // Use the URL directly as a fallback
+              additionalImageResults.push({ url });
+            }
+          }
+        }
+      } else {
+        // No upload service is configured, use direct URLs
+        console.warn("No upload service is configured. Using direct URLs instead.");
+        
+        if (imageUploadMode === 'url' && primaryImageUrl) {
+          // Use the URL directly
+          productImageUrl = primaryImageUrl;
+        } else if (imageUploadMode === 'file' && primaryImage) {
+          // Create a data URL from the file
+          const reader = new FileReader();
+          productImageUrl = await new Promise((resolve) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(primaryImage);
+          });
+        }
+        
+        // Handle additional images
+        if (imageUploadMode === 'url' && additionalImageUrls.length > 0) {
+          additionalImageResults = additionalImageUrls
+            .filter(url => url.trim())
+            .map(url => ({ url }));
+        } else if (imageUploadMode === 'file' && additionalImages.length > 0) {
+          // Create data URLs for each additional image
+          for (const file of additionalImages) {
+            const reader = new FileReader();
+            const dataUrl = await new Promise<string>((resolve) => {
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(file);
+            });
+            additionalImageResults.push({ url: dataUrl });
           }
         }
       }
@@ -420,12 +711,16 @@ export default function AddProductPage() {
         stock: parseInt(formData.stock),
         unit: formData.unit,
         image: productImageUrl,
-        imageId: productImageId,
+        imagePublicId: productImageId,
         additionalImages: additionalImageResults,
-        additionalImageIds: additionalImageIds,
         pincodes: selectedPincodes,
-        vendorId: vendor?.id,
-        status: "active"
+        vendorId: vendor?.id || '',
+        status: "active" as const
+      }
+      
+      // Ensure vendor ID is provided
+      if (!vendor?.id) {
+        throw new Error("Vendor ID is required. Please reload the page or contact support.");
       }
       
       const productId = await addProduct(productData)
@@ -450,7 +745,7 @@ export default function AddProductPage() {
       
       // Provide more specific error message for image upload issues
       if (errorMessage.includes("Failed to upload")) {
-        errorMessage += ". This might be due to image upload service configuration issues. Please try again or contact support."
+        errorMessage += ". This might be due to image upload service configuration issues. Please try using image URLs instead."
       }
       
       setError(errorMessage)
@@ -522,6 +817,16 @@ export default function AddProductPage() {
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{configError}</AlertDescription>
+        </Alert>
+      )}
+
+      {isConfigChecking && (
+        <Alert className="bg-blue-50 border-blue-200">
+          <Info className="h-4 w-4" />
+          <AlertDescription className="flex items-center">
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Checking upload configuration...
+          </AlertDescription>
         </Alert>
       )}
 
@@ -652,8 +957,14 @@ export default function AddProductPage() {
                     className="mr-2"
                     checked={imageUploadMode === 'file'}
                     onChange={() => setImageUploadMode('file')}
+                    disabled={!!configError && configError.includes("not properly configured")}
                   />
-                  <label htmlFor="upload-file">Upload from device</label>
+                  <label 
+                    htmlFor="upload-file" 
+                    className={!!configError && configError.includes("not properly configured") ? "text-gray-400" : ""}
+                  >
+                    Upload from device
+                  </label>
                 </div>
                 <div className="flex items-center">
                   <input
@@ -666,8 +977,25 @@ export default function AddProductPage() {
                     onChange={() => setImageUploadMode('url')}
                   />
                   <label htmlFor="upload-url">Image URL</label>
+                  {!!configError && configError.includes("not properly configured") && (
+                    <span className="ml-2 text-xs text-green-600">
+                      (Recommended)
+                    </span>
+                  )}
                 </div>
               </div>
+
+              {configError && (
+                <Alert className="bg-blue-50 border-blue-200">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    {imageUploadMode === 'url' ? 
+                      "You can use direct image URLs from other websites (make sure they are publicly accessible)" :
+                      "File upload might not work due to configuration issues. Consider using image URLs instead."
+                    }
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {/* Primary Image Section */}
               <div>
@@ -725,6 +1053,7 @@ export default function AddProductPage() {
               <div>
                 <Label className="block mb-2 font-medium">Additional Images (Optional, max 2)</Label>
 
+                {imageUploadMode === 'file' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   {/* Display additional image previews */}
                   {additionalImagePreviews.map((preview, index) => (
@@ -760,6 +1089,55 @@ export default function AddProductPage() {
                     </div>
                   )}
                 </div>
+                ) : (
+                  /* URL input mode for additional images */
+                  <div className="space-y-4">
+                    {additionalImageUrls.map((url, index) => (
+                      <div key={index} className="flex flex-col space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            placeholder="https://example.com/image.jpg"
+                            value={url}
+                            onChange={(e) => handleAdditionalImageUrl(index, e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => removeAdditionalImageUrl(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {additionalImagePreviews[index] && (
+                          <div className="relative h-32 w-full border rounded-md">
+                            <Image
+                              src={additionalImagePreviews[index]}
+                              alt={`Additional image ${index + 1}`}
+                              fill
+                              className="object-contain rounded-md"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    
+                    {additionalImageUrls.length < 2 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center"
+                        onClick={handleAddAdditionalImageUrl}
+                      >
+                        <ImageIcon className="h-4 w-4 mr-2" />
+                        Add Image URL
+                      </Button>
+                    )}
+                  </div>
+                )}
 
                 <input
                   ref={additionalFileInputRef}
@@ -810,7 +1188,9 @@ export default function AddProductPage() {
             <Button
               type="submit"
               className="bg-green-500 hover:bg-green-600"
-              disabled={isSubmitting || selectedPincodes.length === 0 || !primaryImage}
+              disabled={isSubmitting || selectedPincodes.length === 0 || 
+                (imageUploadMode === 'file' && !primaryImage) || 
+                (imageUploadMode === 'url' && !primaryImageUrl)}
             >
               {isSubmitting ? (
                 <div className="flex items-center">

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useVendor } from "@/lib/context/vendor-provider"
-import { AlertCircle, Info, ShieldCheck } from "lucide-react"
+import { AlertCircle, Info, ShieldCheck, LogIn } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { setVendorSessionCookies } from "@/lib/firebase/set-session-cookie"
 import LoginDebug from "./debug"
@@ -76,7 +76,7 @@ export default function VendorLogin() {
             console.log("Vendor data available. Setting session cookies with ID:", vendorId);
 
             // Set session cookies and redirect
-            setVendorSessionCookies(vendorId, false);
+            setVendorSessionCookies(vendorId);
             
             // Use direct window.location for more reliable redirect in production
             if (process.env.NODE_ENV === 'production') {
@@ -99,7 +99,7 @@ export default function VendorLogin() {
               if (auth && auth.currentUser) {
                 const uid = auth.currentUser.uid;
                 console.log("Found authenticated user with UID:", uid);
-                setVendorSessionCookies(uid, false);
+                setVendorSessionCookies(uid);
                 window.location.href = "/vendor";
                 return;
               }
@@ -138,65 +138,73 @@ export default function VendorLogin() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl text-center">Vendor Login</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-blue-100">
+      <div className="w-full max-w-md px-4">
+        <Card className="w-full shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+          <CardHeader className="pb-4">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
+              <LogIn className="h-8 w-8 text-white" />
+            </div>
+            <CardTitle className="text-2xl text-center font-bold bg-gradient-to-r from-indigo-600 to-purple-700 bg-clip-text text-transparent">Vendor Portal</CardTitle>
+            <CardDescription className="text-center">Login to manage your store and orders</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-4 border-red-300 bg-red-50">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="font-medium">{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <Alert className="mb-6 border-indigo-200 bg-indigo-50">
+              <ShieldCheck className="h-4 w-4 text-indigo-600" />
+              <AlertTitle className="font-semibold text-indigo-800">Admin Approval Required</AlertTitle>
+              <AlertDescription className="text-indigo-700">
+                Only vendors that have been approved by an admin can login.
+                If you're having trouble logging in, please contact support.
+              </AlertDescription>
             </Alert>
-          )}
 
-          <Alert className="mb-4">
-            <ShieldCheck className="h-4 w-4" />
-            <AlertTitle>Admin Approval Required</AlertTitle>
-            <AlertDescription>
-              Only vendors that have been approved by an admin can login.
-              If you're having trouble logging in, please contact support.
-            </AlertDescription>
-          </Alert>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="vendor@example.com"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isSubmitting || isLoading}
-            >
-              {isSubmitting || isLoading ? "Logging in..." : "Login"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium text-gray-700">
+                  Email Address
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="vendor@example.com"
+                  className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="password" className="text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 py-6"
+                disabled={isSubmitting || isLoading}
+              >
+                {isSubmitting || isLoading ? "Logging in..." : "Login to Dashboard"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

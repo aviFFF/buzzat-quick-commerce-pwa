@@ -71,6 +71,16 @@
   }
 }
 
+/* Hide footer and bottom nav on admin/vendor pages */
+body.admin-page [data-footer="true"],
+body.admin-page [data-bottom-nav="true"],
+body.admin-page [data-pincode-modal="true"],
+body.vendor-page [data-footer="true"],
+body.vendor-page [data-bottom-nav="true"],
+body.vendor-page [data-pincode-modal="true"] {
+  display: none !important;
+}
+
 /* Customer interface specific styles */
 .customer-btn {
   @apply bg-orange-500 hover:bg-orange-600;
