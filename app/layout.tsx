@@ -11,6 +11,7 @@ import PincodeRequiredModal from "@/components/pincode-required-modal"
 // Import environment variables setup
 import "@/lib/env"
 import { shouldShowHeaderFooter } from "@/lib/utils"
+import { shouldShowHeaderFooter } from "@/lib/utils"
 
 // Remove Google font dependency
 const fontClass = "font-sans"
@@ -24,6 +25,7 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Buzzat",
   },
+  generator: 'buzzat'
   generator: 'buzzat'
 }
 
@@ -39,6 +41,9 @@ export default function RootLayout({
   // We'll rely on client-side detection for header/footer visibility
   // Server-side will show them by default, then client-side JS will adjust
   const showHeaderFooter = true;
+  // We'll rely on client-side detection for header/footer visibility
+  // Server-side will show them by default, then client-side JS will adjust
+  const showHeaderFooter = true;
 
   return (
     <html lang="en" className="light" style={{ colorScheme: "light" }} suppressHydrationWarning>
@@ -50,7 +55,12 @@ export default function RootLayout({
             </div>
             <div id="layout-footer-container" style={{display: 'block'}}>
               <Footer data-footer="true" />
+            <div id="layout-footer-container" style={{display: 'block'}}>
+              <Footer data-footer="true" />
                 <div className="block sm:hidden">
+                <BottomNav key="bottom-nav" data-bottom-nav="true" />
+              </div>
+              <PincodeRequiredModal data-pincode-modal="true" />
                 <BottomNav key="bottom-nav" data-bottom-nav="true" />
               </div>
               <PincodeRequiredModal data-pincode-modal="true" />
@@ -59,6 +69,8 @@ export default function RootLayout({
           <Toaster />
         </ThemeProvider>
         <Script src="/service-worker-register.js" strategy="lazyOnload" />
+        {/* Script to update header/footer visibility on client side */}
+        <Script id="update-layout" strategy="afterInteractive">
         {/* Script to update header/footer visibility on client side */}
         <Script id="update-layout" strategy="afterInteractive">
           {`
@@ -117,6 +129,37 @@ export default function RootLayout({
               } else if (pathname.includes('/vendor')) {
                 document.body.classList.add('vendor-page');
             }
+              
+              if (pathname.includes('/admin') || pathname.includes('/vendor')) {
+                const container = document.getElementById('layout-footer-container');
+                if (container) {
+                  container.style.display = 'none';
+                }
+              }
+            })();
+            
+            // Run on initial load
+            updateLayoutVisibility();
+            
+            // Listen for URL changes
+            window.addEventListener('popstate', updateLayoutVisibility);
+            
+            // For Next.js client-side navigation
+            const originalPushState = history.pushState;
+            const originalReplaceState = history.replaceState;
+            
+            history.pushState = function() {
+              originalPushState.apply(this, arguments);
+              updateLayoutVisibility();
+            };
+            
+            history.replaceState = function() {
+              originalReplaceState.apply(this, arguments);
+              updateLayoutVisibility();
+            };
+            
+            // Also check periodically in case we miss any navigation events
+            setInterval(updateLayoutVisibility, 1000);
               
               if (pathname.includes('/admin') || pathname.includes('/vendor')) {
                 const container = document.getElementById('layout-footer-container');
