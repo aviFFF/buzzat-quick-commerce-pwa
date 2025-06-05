@@ -399,7 +399,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
                   </Button>
                 </form>
               </>
-            )}
+            )} 
             
             <p className="text-xs text-center text-gray-500 mt-4">
               By continuing, you agree to our Terms of Service & Privacy Policy
