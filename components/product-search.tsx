@@ -11,6 +11,7 @@ import { usePincode } from "@/lib/hooks/use-pincode"
 import { useDebounce } from "@/hooks/use-debounce"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useRouter } from "next/navigation"
 
 interface Product {
   id: string
@@ -31,6 +32,7 @@ export function ProductSearch() {
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const { pincode } = usePincode()
   const commandRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -74,10 +76,10 @@ export function ProductSearch() {
         
         // Filter results client-side for more flexible matching
         const results = querySnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as Product))
+          .map(doc => ({ id: doc.id, ...doc.data() } as unknown as Product))
           .filter(product => 
             product.name.toLowerCase().includes(searchTermLower) ||
-            product.description.toLowerCase().includes(searchTermLower)
+            product.description?.toLowerCase().includes(searchTermLower)
           )
           .slice(0, 5)
         
@@ -105,23 +107,35 @@ export function ProductSearch() {
     }
   }
 
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (searchTerm.trim().length >= 3) {
+      setIsOpen(false)
+      router.push(`/search?q=${encodeURIComponent(searchTerm.trim())}`)
+    }
+  }
+
   return (
     <div className="relative w-full" ref={commandRef}>
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-        <Input
-          type="search"
-          placeholder="Search for products..."
-          value={searchTerm}
-          onChange={handleInputChange}
-          className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-          onFocus={() => {
-            if (searchTerm.length >= 3) {
-              setIsOpen(true)
-            }
-          }}
-        />
-      </div>
+      <form onSubmit={handleSubmit}>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+          <Input
+            type="search"
+            placeholder="Search for products..."
+            value={searchTerm}
+            onChange={handleInputChange}
+            className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            onFocus={() => {
+              if (searchTerm.length >= 3) {
+                setIsOpen(true)
+              }
+            }}
+          />
+        </div>
+      </form>
 
       {isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-white rounded-md shadow-lg border overflow-hidden">
@@ -160,10 +174,26 @@ export function ProductSearch() {
                   </div>
                 </Link>
               ))}
+              <div className="p-2 border-t">
+                <button 
+                  onClick={handleSubmit}
+                  className="w-full text-center text-sm text-blue-600 hover:underline py-1"
+                >
+                  See all results for "{searchTerm}"
+                </button>
+              </div>
             </div>
           ) : debouncedSearchTerm.length >= 3 ? (
             <div className="p-4 text-center text-sm text-gray-500">
               No products found
+              <div className="mt-2">
+                <button 
+                  onClick={handleSubmit}
+                  className="text-blue-600 hover:underline"
+                >
+                  Search for "{searchTerm}"
+                </button>
+              </div>
             </div>
           ) : null}
         </div>

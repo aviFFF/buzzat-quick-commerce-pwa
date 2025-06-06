@@ -9,8 +9,6 @@ import Footer from "@/components/footer"
 import Script from "next/script"
 import PincodeRequiredModal from "@/components/pincode-required-modal"
 import "@/lib/env"
-import { shouldShowHeaderFooter } from "@/lib/utils"
-
 const fontClass = "font-sans"
 
 export const metadata: Metadata = {

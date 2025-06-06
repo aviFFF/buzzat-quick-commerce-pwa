@@ -56,6 +56,12 @@ export const initRecaptchaVerifier = async (containerId: string) => {
       element.remove();
     });
 
+    // Get the container element
+    const container = document.getElementById(containerId);
+    if (!container) {
+      throw new Error(`Container with ID "${containerId}" not found`);
+    }
+
     // Log debug information about the environment
     console.log("Current hostname:", window.location.hostname);
     console.log("Firebase auth domain:", auth.app.options.authDomain);
@@ -63,22 +69,27 @@ export const initRecaptchaVerifier = async (containerId: string) => {
 
     // Create a new RecaptchaVerifier instance
     const verifier = new RecaptchaVerifier(auth, containerId, {
-      size: process.env.NODE_ENV === "development" ? "normal" : "invisible",
-      callback: () => {
-        console.log("Recaptcha verified")
+      size: "normal", // Always use normal size for better visibility
+      callback: (response: any) => {
+        console.log("Recaptcha verified", response ? "with response" : "without response")
       },
       "expired-callback": () => {
         console.log("Recaptcha expired, refreshing...")
         // Force refresh the recaptcha
         if (verifier) {
-          verifier.clear();
-          verifier.render();
+          try {
+            verifier.clear();
+            verifier.render();
+          } catch (e) {
+            console.error("Error refreshing expired reCAPTCHA:", e);
+          }
         }
       }
     })
     
     // Render the recaptcha to ensure it's ready
     await verifier.render();
+    console.log("reCAPTCHA rendered successfully");
     
     return verifier;
   } catch (error: any) {
@@ -394,12 +405,6 @@ export async function signInWithPhoneNumber(phoneNumber: string, recaptchaVerifi
             error: new Error(AUTH_CONFIG.OTP_LIMIT_MESSAGE)
           };
         }
-        
-        // Increment usage count
-        usageData.count += 1;
-        localStorage.setItem(AUTH_CONFIG.OTP_USAGE_STORAGE_KEY, JSON.stringify(usageData));
-        
-        console.log(`OTP usage: ${usageData.count}/${AUTH_CONFIG.DAILY_OTP_LIMIT} for today`);
       } catch (error) {
         console.error("Error checking OTP limit:", error);
         // Continue even if there's an error with the limit checking
@@ -413,10 +418,79 @@ export async function signInWithPhoneNumber(phoneNumber: string, recaptchaVerifi
       return { success: false, error: new Error("Auth is not initialized") }
     }
 
-    const confirmationResult = await firebaseSignInWithPhoneNumber(auth, formattedPhoneNumber, recaptchaVerifier)
+    // Verify that recaptchaVerifier is valid
+    if (!recaptchaVerifier || typeof recaptchaVerifier.render !== 'function') {
+      console.error("Invalid recaptchaVerifier provided", recaptchaVerifier);
+      return { 
+        success: false, 
+        error: new Error("Verification service is not properly initialized. Please refresh and try again.")
+      };
+    }
+
+    // Check if the recaptchaVerifier has already been used
+    try {
+      // Try to get the widgetId, which should be available if the verifier has been rendered
+      const widgetId = recaptchaVerifier._widgetId;
+      if (!widgetId) {
+        console.warn("reCAPTCHA widget ID not found, may need to re-render");
+        await recaptchaVerifier.render();
+      }
+    } catch (error) {
+      console.error("Error checking recaptchaVerifier state:", error);
+      // Try to re-render if there was an error
+      try {
+        await recaptchaVerifier.render();
+      } catch (renderError) {
+        console.error("Failed to re-render reCAPTCHA:", renderError);
+        return { 
+          success: false, 
+          error: new Error("Verification service failed. Please refresh the page and try again.")
+        };
+      }
+    }
+
+    // Send the SMS verification code
+    console.log("Calling firebaseSignInWithPhoneNumber with:", formattedPhoneNumber);
+    const confirmationResult = await firebaseSignInWithPhoneNumber(auth, formattedPhoneNumber, recaptchaVerifier);
+    console.log("SMS verification code sent successfully");
+    
     return { success: true, confirmationResult }
-  } catch (error) {
-    console.error("Error sending verification code:", error)
+  } catch (error: any) {
+    console.error("Error sending verification code:", error);
+    
+    // Provide more specific error messages based on Firebase error codes
+    if (error.code) {
+      switch (error.code) {
+        case 'auth/invalid-phone-number':
+          return { 
+            success: false, 
+            error: new Error("The phone number is invalid. Please enter a valid 10-digit number.")
+          };
+        case 'auth/missing-phone-number':
+          return { 
+            success: false, 
+            error: new Error("Please enter your phone number.")
+          };
+        case 'auth/quota-exceeded':
+          return { 
+            success: false, 
+            error: new Error("SMS quota exceeded. Please try again later.")
+          };
+        case 'auth/captcha-check-failed':
+          return { 
+            success: false, 
+            error: new Error("reCAPTCHA verification failed. Please refresh and try again.")
+          };
+        case 'auth/too-many-requests':
+          return { 
+            success: false, 
+            error: new Error("Too many requests. Please try again later.")
+          };
+        default:
+          return { success: false, error };
+      }
+    }
+    
     return { success: false, error }
   }
 }
@@ -466,6 +540,14 @@ export async function verifyOTP(verificationId: string, verificationCode: string
       }
     }
 
+    // Validate OTP format
+    if (!verificationCode || verificationCode.length !== 6 || !/^\d+$/.test(verificationCode)) {
+      return { 
+        success: false, 
+        error: new Error("Please enter a valid 6-digit verification code") 
+      };
+    }
+
     // PRODUCTION: Use actual Firebase verification
     console.log("Using real Firebase verification")
     if (!auth) {
@@ -473,13 +555,47 @@ export async function verifyOTP(verificationId: string, verificationCode: string
       return { success: false, error: new Error("Auth is not initialized") }
     }
 
-    const credential = PhoneAuthProvider.credential(verificationId, verificationCode)
-    await signInWithCredential(auth, credential)
-    console.log("User successfully authenticated with phone number")
-    return { success: true }
-  } catch (error) {
+    try {
+      console.log("Creating phone auth credential with verification ID and code");
+      const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
+      
+      console.log("Signing in with credential");
+      const result = await signInWithCredential(auth, credential);
+      console.log("User successfully authenticated with phone number:", result.user.phoneNumber);
+      
+      return { success: true, user: result.user };
+    } catch (verificationError: any) {
+      console.error("Error in verification process:", verificationError);
+      
+      // Handle specific verification errors
+      if (verificationError.code) {
+        switch (verificationError.code) {
+          case 'auth/invalid-verification-code':
+            return { 
+              success: false, 
+              error: new Error("The verification code is invalid. Please check and try again.") 
+            };
+          case 'auth/code-expired':
+            return { 
+              success: false, 
+              error: new Error("The verification code has expired. Please request a new one.") 
+            };
+          default:
+            return { 
+              success: false, 
+              error: new Error(`Verification failed: ${verificationError.message || 'Unknown error'}`) 
+            };
+        }
+      }
+      
+      throw verificationError;
+    }
+  } catch (error: any) {
     console.error("Error verifying code:", error)
-    return { success: false, error }
+    return { 
+      success: false, 
+      error: new Error(error.message || "Failed to verify the code. Please try again.") 
+    }
   }
 }
 

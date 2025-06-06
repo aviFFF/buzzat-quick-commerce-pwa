@@ -28,6 +28,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
   const [otpCount, setOtpCount] = useState<number>(0);
   const [otpLimitReached, setOtpLimitReached] = useState<boolean>(false);
   const { refreshAuthState } = useAuth()
+  const recaptchaInitAttempts = useRef(0)
 
   // Cleanup any existing recaptcha elements when component mounts
   useEffect(() => {
@@ -67,14 +68,28 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
         !recaptchaVerifierRef.current &&
         isAuthInitialized &&
         !recaptchaInitialized &&
-        !firebaseLoading
+        !firebaseLoading &&
+        recaptchaInitAttempts.current < 3 // Limit retry attempts
       ) {
+        recaptchaInitAttempts.current += 1;
+        console.log(`Initializing reCAPTCHA (attempt ${recaptchaInitAttempts.current})`);
+        
         try {
+          // Make sure the container is visible and has dimensions
+          if (recaptchaContainerRef.current.offsetWidth === 0) {
+            console.warn("reCAPTCHA container has zero width, adjusting...");
+            recaptchaContainerRef.current.style.width = "100%";
+            recaptchaContainerRef.current.style.height = "80px";
+            recaptchaContainerRef.current.style.display = "block";
+          }
+          
           recaptchaVerifierRef.current = await initRecaptchaVerifier("recaptcha-container");
+          console.log("reCAPTCHA initialized successfully");
           setRecaptchaInitialized(true);
-        } catch (error: any) {
+          setError(null);
+        } catch (error) {
           console.error("Error initializing recaptcha:", error);
-          setError("Failed to initialize verification. Please try again.");
+          setError("Failed to initialize verification. Please try refreshing the page.");
         }
       }
     };
@@ -83,7 +98,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
     if (isAuthInitialized && !recaptchaInitialized && !firebaseLoading) {
       const timer = setTimeout(() => {
         initRecaptcha();
-      }, 1000);
+      }, 1500); // Increased delay to ensure DOM is fully rendered
       
       return () => clearTimeout(timer);
     }
@@ -113,22 +128,52 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
     setIsLoading(true);
     setError(null);
 
+    // Validate phone number format
+    if (!/^[6-9]\d{9}$/.test(phoneNumber)) {
+      setError("Please enter a valid 10-digit Indian mobile number");
+      setIsLoading(false);
+      return;
+    }
+
     try {
+      // Check if recaptcha is initialized
       if (!recaptchaVerifierRef.current || !recaptchaInitialized) {
-        // Try to initialize recaptcha again if it's not initialized
+        console.log("reCAPTCHA not initialized, attempting to initialize now");
+        
+        // Try to initialize recaptcha again
         try {
+          // Force cleanup of any existing instances
+          const existingRecaptchas = document.querySelectorAll('.grecaptcha-badge');
+          existingRecaptchas.forEach(element => {
+            element.remove();
+          });
+          
+          const iframes = document.querySelectorAll('iframe[src*="recaptcha"]');
+          iframes.forEach(element => {
+            element.remove();
+          });
+          
+          // Make sure the container is visible
+          if (recaptchaContainerRef.current) {
+            recaptchaContainerRef.current.innerHTML = '';
+            recaptchaContainerRef.current.style.width = "100%";
+            recaptchaContainerRef.current.style.height = "80px";
+            recaptchaContainerRef.current.style.display = "block";
+          }
+          
           recaptchaVerifierRef.current = await initRecaptchaVerifier("recaptcha-container");
           setRecaptchaInitialized(true);
-        } catch (error: any) {
+        } catch (error) {
           console.error("Error reinitializing recaptcha:", error);
-          throw new Error("Could not initialize verification. Please refresh and try again.");
+          throw new Error("Could not initialize verification. Please refresh the page and try again.");
         }
       }
 
       if (!recaptchaVerifierRef.current) {
-        throw new Error("Recaptcha not initialized");
+        throw new Error("reCAPTCHA not initialized");
       }
 
+      console.log("Sending OTP to +91" + phoneNumber);
       const { success, confirmationResult, error } = await signInWithPhoneNumber(
         phoneNumber,
         recaptchaVerifierRef.current
@@ -265,11 +310,23 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
                   </div>
                 )}
                 
-                <div id="recaptcha-container" ref={recaptchaContainerRef} className="h-[80px] flex justify-center"></div>
+                <div 
+                  id="recaptcha-container" 
+                  ref={recaptchaContainerRef} 
+                  className="h-[80px] flex justify-center items-center"
+                  style={{ minHeight: '80px', width: '100%' }}
+                ></div>
+                
+                {!recaptchaInitialized && !isLoading && (
+                  <div className="text-xs text-amber-600 text-center">
+                    Initializing verification... If it doesn't appear, please refresh the page.
+                  </div>
+                )}
+                
                 <Button
                   type="submit"
                   className="w-full bg-green-600 text-white hover:bg-green-700"
-                  disabled={isLoading || otpLimitReached}
+                  disabled={isLoading || otpLimitReached || !recaptchaInitialized}
                 >
                   {isLoading ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
