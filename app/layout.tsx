@@ -11,7 +11,6 @@ import PincodeRequiredModal from "@/components/pincode-required-modal"
 // Import environment variables setup
 import "@/lib/env"
 import { shouldShowHeaderFooter } from "@/lib/utils"
-import { shouldShowHeaderFooter } from "@/lib/utils"
 
 // Remove Google font dependency
 const fontClass = "font-sans"
@@ -26,7 +25,6 @@ export const metadata: Metadata = {
     title: "Buzzat",
   },
   generator: 'buzzat'
-  generator: 'buzzat'
 }
 
 export const viewport = {
@@ -38,9 +36,6 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  // We'll rely on client-side detection for header/footer visibility
-  // Server-side will show them by default, then client-side JS will adjust
-  const showHeaderFooter = true;
   // We'll rely on client-side detection for header/footer visibility
   // Server-side will show them by default, then client-side JS will adjust
   const showHeaderFooter = true;
@@ -69,8 +64,6 @@ export default function RootLayout({
           <Toaster />
         </ThemeProvider>
         <Script src="/service-worker-register.js" strategy="lazyOnload" />
-        {/* Script to update header/footer visibility on client side */}
-        <Script id="update-layout" strategy="afterInteractive">
         {/* Script to update header/footer visibility on client side */}
         <Script id="update-layout" strategy="afterInteractive">
           {`
