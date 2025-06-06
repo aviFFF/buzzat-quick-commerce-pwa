@@ -98,6 +98,14 @@ export default function OrderDetail({ params }: { params: { id: string } }) {
         if (orderDoc.exists()) {
           const orderData = orderDoc.data();
           
+          // Check if this order belongs to the current vendor
+          if (orderData.vendorId && orderData.vendorId !== vendor.id) {
+            console.error("Order does not belong to this vendor");
+            setError("You do not have permission to view this order.");
+            setLoading(false);
+            return;
+          }
+          
           // Ensure all required fields exist with defaults
           const safeOrderData = {
             id: orderDoc.id,

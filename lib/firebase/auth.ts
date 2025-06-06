@@ -45,14 +45,20 @@ export const initRecaptchaVerifier = async (containerId: string) => {
     }
     
     // Clean up any existing recaptcha verifiers
-    const existingRecaptchas = document.querySelectorAll('.grecaptcha-badge');
+    const existingRecaptchas = document.querySelectorAll('.grecaptcha-badge, .grecaptcha-logo, div[class^="grecaptcha-"]');
     existingRecaptchas.forEach(element => {
       element.remove();
     });
     
     // Also remove any hidden recaptcha iframes
-    const iframes = document.querySelectorAll('iframe[src*="recaptcha"]');
+    const iframes = document.querySelectorAll('iframe[src*="recaptcha"], iframe[title*="recaptcha"]');
     iframes.forEach(element => {
+      element.remove();
+    });
+    
+    // Remove any reCAPTCHA scripts to ensure a clean slate
+    const scripts = document.querySelectorAll('script[src*="recaptcha"]');
+    scripts.forEach(element => {
       element.remove();
     });
 
@@ -61,13 +67,24 @@ export const initRecaptchaVerifier = async (containerId: string) => {
     if (!container) {
       throw new Error(`Container with ID "${containerId}" not found`);
     }
+    
+    // Ensure the container is visible and has dimensions
+    if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+      console.warn("reCAPTCHA container has zero dimensions, adjusting...");
+      container.style.width = "100%";
+      container.style.height = "80px";
+      container.style.display = "block";
+      
+      // Force a reflow to ensure styles are applied
+      container.getBoundingClientRect();
+    }
 
     // Log debug information about the environment
     console.log("Current hostname:", window.location.hostname);
     console.log("Firebase auth domain:", auth.app.options.authDomain);
     console.log("Using recaptcha size:", process.env.NODE_ENV === "development" ? "normal" : "invisible");
 
-    // Create a new RecaptchaVerifier instance
+    // Create a new RecaptchaVerifier instance with better error handling
     const verifier = new RecaptchaVerifier(auth, containerId, {
       size: "normal", // Always use normal size for better visibility
       callback: (response: any) => {
@@ -84,12 +101,33 @@ export const initRecaptchaVerifier = async (containerId: string) => {
             console.error("Error refreshing expired reCAPTCHA:", e);
           }
         }
+      },
+      "error-callback": (error: any) => {
+        console.error("reCAPTCHA encountered an error:", error);
       }
-    })
+    });
+    
+    // Wait a brief moment before rendering to ensure DOM is ready
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     // Render the recaptcha to ensure it's ready
-    await verifier.render();
-    console.log("reCAPTCHA rendered successfully");
+    try {
+      await verifier.render();
+      console.log("reCAPTCHA rendered successfully");
+    } catch (renderError) {
+      console.error("Error rendering reCAPTCHA:", renderError);
+      
+      // Try one more time with a delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      try {
+        await verifier.render();
+        console.log("reCAPTCHA rendered successfully on second attempt");
+      } catch (secondRenderError) {
+        console.error("Failed to render reCAPTCHA on second attempt:", secondRenderError);
+        throw new Error("Could not initialize verification. Please refresh the page and try again.");
+      }
+    }
     
     return verifier;
   } catch (error: any) {
@@ -101,6 +139,16 @@ export const initRecaptchaVerifier = async (containerId: string) => {
       console.error("Current hostname:", window.location.hostname);
       console.error("Expected Firebase auth domain:", auth?.app?.options?.authDomain);
       throw new Error("Domain verification failed. Please ensure your domain is authorized in the Firebase console.");
+    }
+    
+    // Check for network issues
+    if (error.message && (error.message.includes("network") || error.message.includes("connection"))) {
+      throw new Error("Network error. Please check your internet connection and try again.");
+    }
+    
+    // Handle other common errors
+    if (error.message && error.message.includes("RecaptchaVerifier")) {
+      throw new Error("Verification service failed to initialize. Please refresh the page and try again.");
     }
     
     throw error
@@ -419,7 +467,15 @@ export async function signInWithPhoneNumber(phoneNumber: string, recaptchaVerifi
     }
 
     // Verify that recaptchaVerifier is valid
-    if (!recaptchaVerifier || typeof recaptchaVerifier.render !== 'function') {
+    if (!recaptchaVerifier) {
+      console.error("No recaptchaVerifier provided");
+      return { 
+        success: false, 
+        error: new Error("Verification service is not available. Please refresh and try again.")
+      };
+    }
+    
+    if (typeof recaptchaVerifier.render !== 'function') {
       console.error("Invalid recaptchaVerifier provided", recaptchaVerifier);
       return { 
         success: false, 
@@ -427,18 +483,31 @@ export async function signInWithPhoneNumber(phoneNumber: string, recaptchaVerifi
       };
     }
 
-    // Check if the recaptchaVerifier has already been used
+    // Check if the recaptchaVerifier has already been used or needs to be re-rendered
+    let needsRerender = false;
     try {
       // Try to get the widgetId, which should be available if the verifier has been rendered
       const widgetId = recaptchaVerifier._widgetId;
       if (!widgetId) {
-        console.warn("reCAPTCHA widget ID not found, may need to re-render");
-        await recaptchaVerifier.render();
+        console.warn("reCAPTCHA widget ID not found, needs to re-render");
+        needsRerender = true;
+      }
+      
+      // Check if the reCAPTCHA element still exists in the DOM
+      const recaptchaFrame = document.querySelector(`iframe[src*="recaptcha"][name^="a-${recaptchaVerifier._widgetId}"]`);
+      if (!recaptchaFrame) {
+        console.warn("reCAPTCHA iframe not found in DOM, needs to re-render");
+        needsRerender = true;
       }
     } catch (error) {
       console.error("Error checking recaptchaVerifier state:", error);
-      // Try to re-render if there was an error
+      needsRerender = true;
+    }
+    
+    // Re-render if needed
+    if (needsRerender) {
       try {
+        console.log("Re-rendering reCAPTCHA...");
         await recaptchaVerifier.render();
       } catch (renderError) {
         console.error("Failed to re-render reCAPTCHA:", renderError);
@@ -449,12 +518,30 @@ export async function signInWithPhoneNumber(phoneNumber: string, recaptchaVerifi
       }
     }
 
+    // Add a small delay to ensure reCAPTCHA is fully ready
+    await new Promise(resolve => setTimeout(resolve, 300));
+
     // Send the SMS verification code
     console.log("Calling firebaseSignInWithPhoneNumber with:", formattedPhoneNumber);
-    const confirmationResult = await firebaseSignInWithPhoneNumber(auth, formattedPhoneNumber, recaptchaVerifier);
-    console.log("SMS verification code sent successfully");
     
-    return { success: true, confirmationResult }
+    try {
+      const confirmationResult = await firebaseSignInWithPhoneNumber(auth, formattedPhoneNumber, recaptchaVerifier);
+      console.log("SMS verification code sent successfully");
+      return { success: true, confirmationResult };
+    } catch (smsError: any) {
+      console.error("Error from Firebase signInWithPhoneNumber:", smsError);
+      
+      // Handle specific SMS sending errors
+      if (smsError.code === 'auth/captcha-check-failed') {
+        return { 
+          success: false, 
+          error: new Error("Verification check failed. Please try again."),
+          code: 'auth/captcha-check-failed'
+        };
+      }
+      
+      throw smsError; // Re-throw to be caught by the outer catch block
+    }
   } catch (error: any) {
     console.error("Error sending verification code:", error);
     
@@ -464,34 +551,71 @@ export async function signInWithPhoneNumber(phoneNumber: string, recaptchaVerifi
         case 'auth/invalid-phone-number':
           return { 
             success: false, 
-            error: new Error("The phone number is invalid. Please enter a valid 10-digit number.")
+            error: new Error("The phone number is invalid. Please enter a valid 10-digit number."),
+            code: error.code
           };
         case 'auth/missing-phone-number':
           return { 
             success: false, 
-            error: new Error("Please enter your phone number.")
+            error: new Error("Please enter your phone number."),
+            code: error.code
           };
         case 'auth/quota-exceeded':
           return { 
             success: false, 
-            error: new Error("SMS quota exceeded. Please try again later.")
+            error: new Error("SMS quota exceeded. Please try again later."),
+            code: error.code
           };
         case 'auth/captcha-check-failed':
           return { 
             success: false, 
-            error: new Error("reCAPTCHA verification failed. Please refresh and try again.")
+            error: new Error("reCAPTCHA verification failed. Please refresh and try again."),
+            code: error.code
           };
         case 'auth/too-many-requests':
           return { 
             success: false, 
-            error: new Error("Too many requests. Please try again later.")
+            error: new Error("Too many requests. Please try again later."),
+            code: error.code
+          };
+        case 'auth/network-request-failed':
+          return {
+            success: false,
+            error: new Error("Network error. Please check your internet connection and try again."),
+            code: error.code
           };
         default:
-          return { success: false, error };
+          return { 
+            success: false, 
+            error: new Error(`Error: ${error.message || "Failed to send verification code"}`),
+            code: error.code
+          };
       }
     }
     
-    return { success: false, error }
+    // For non-code errors, check for common error messages
+    if (error.message) {
+      if (error.message.includes('captcha') || error.message.includes('reCAPTCHA')) {
+        return { 
+          success: false, 
+          error: new Error("Verification check failed. Please refresh the page and try again."),
+          code: 'auth/captcha-error'
+        };
+      }
+      
+      if (error.message.includes('network') || error.message.includes('connection')) {
+        return {
+          success: false,
+          error: new Error("Network error. Please check your internet connection and try again."),
+          code: 'network-error'
+        };
+      }
+    }
+    
+    return { 
+      success: false, 
+      error: new Error("Failed to send verification code. Please try again.")
+    };
   }
 }
 

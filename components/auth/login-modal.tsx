@@ -13,6 +13,17 @@ import { useRouter } from "next/navigation"
 import { AUTH_CONFIG } from "@/lib/firebase/config"
 import { useAuth } from "@/lib/context/auth-context"
 
+// Add type declarations for global objects
+declare global {
+  interface Window {
+    grecaptcha: any;
+  }
+  
+  interface Error {
+    code?: string;
+  }
+}
+
 export function LoginModal({ onClose }: { onClose: () => void }) {
   const [phoneNumber, setPhoneNumber] = useState("")
   const [verificationCode, setVerificationCode] = useState("")
@@ -29,79 +40,145 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
   const [otpLimitReached, setOtpLimitReached] = useState<boolean>(false);
   const { refreshAuthState } = useAuth()
   const recaptchaInitAttempts = useRef(0)
+  const initializationTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Cleanup any existing recaptcha elements when component mounts
-  useEffect(() => {
+  // Thorough cleanup of all reCAPTCHA elements
+  const cleanupRecaptcha = () => {
     // Clear any existing recaptcha elements
-    const existingRecaptchas = document.querySelectorAll('.grecaptcha-badge');
+    const existingRecaptchas = document.querySelectorAll('.grecaptcha-badge, .grecaptcha-logo, div[class^="grecaptcha-"], iframe[src*="recaptcha"]');
     existingRecaptchas.forEach(element => {
       element.remove();
     });
     
-    // Also remove any hidden recaptcha iframes
-    const iframes = document.querySelectorAll('iframe[src*="recaptcha"]');
+    // Remove any hidden recaptcha iframes
+    const iframes = document.querySelectorAll('iframe[src*="recaptcha"], iframe[title*="recaptcha"]');
     iframes.forEach(element => {
       element.remove();
     });
     
+    // Remove any reCAPTCHA scripts
+    const scripts = document.querySelectorAll('script[src*="recaptcha"]');
+    scripts.forEach(element => {
+      element.remove();
+    });
+    
+    // Clear any global reCAPTCHA variables
+    if (typeof window !== "undefined" && window.grecaptcha) {
+      try {
+        // @ts-ignore
+        delete window.grecaptcha;
+      } catch (error) {
+        console.error("Error clearing global reCAPTCHA object:", error);
+      }
+    }
+    
+    // Clear the verifier reference
+    if (recaptchaVerifierRef.current) {
+      try {
+        recaptchaVerifierRef.current.clear();
+      } catch (error) {
+        console.error("Error clearing recaptcha verifier:", error);
+      }
+      recaptchaVerifierRef.current = null;
+    }
+    
+    setRecaptchaInitialized(false);
+  };
+
+  // Cleanup any existing recaptcha elements when component mounts and unmounts
+  useEffect(() => {
+    cleanupRecaptcha();
+    
     return () => {
-      // Cleanup when component unmounts
-      if (recaptchaVerifierRef.current) {
-        try {
-          recaptchaVerifierRef.current.clear();
-        } catch (error) {
-          console.error("Error clearing recaptcha:", error);
-        }
-        recaptchaVerifierRef.current = null;
+      // Clear any pending timers
+      if (initializationTimerRef.current) {
+        clearTimeout(initializationTimerRef.current);
       }
       
-      setRecaptchaInitialized(false);
+      // Cleanup when component unmounts
+      cleanupRecaptcha();
     };
   }, []);
 
-  // Initialize recaptcha when component mounts
-  useEffect(() => {
-    const initRecaptcha = async () => {
-      if (
-        typeof window !== "undefined" &&
-        recaptchaContainerRef.current &&
-        !recaptchaVerifierRef.current &&
-        isAuthInitialized &&
-        !recaptchaInitialized &&
-        !firebaseLoading &&
-        recaptchaInitAttempts.current < 3 // Limit retry attempts
-      ) {
-        recaptchaInitAttempts.current += 1;
-        console.log(`Initializing reCAPTCHA (attempt ${recaptchaInitAttempts.current})`);
+  // Initialize recaptcha with improved reliability
+  const initializeRecaptcha = async () => {
+    if (
+      typeof window !== "undefined" &&
+      recaptchaContainerRef.current &&
+      isAuthInitialized &&
+      !recaptchaInitialized &&
+      !firebaseLoading
+    ) {
+      recaptchaInitAttempts.current += 1;
+      console.log(`Initializing reCAPTCHA (attempt ${recaptchaInitAttempts.current})`);
+      
+      try {
+        // Clean up existing instances first
+        cleanupRecaptcha();
         
-        try {
-          // Make sure the container is visible and has dimensions
-          if (recaptchaContainerRef.current.offsetWidth === 0) {
-            console.warn("reCAPTCHA container has zero width, adjusting...");
-            recaptchaContainerRef.current.style.width = "100%";
-            recaptchaContainerRef.current.style.height = "80px";
-            recaptchaContainerRef.current.style.display = "block";
-          }
-          
-          recaptchaVerifierRef.current = await initRecaptchaVerifier("recaptcha-container");
-          console.log("reCAPTCHA initialized successfully");
-          setRecaptchaInitialized(true);
-          setError(null);
-        } catch (error) {
-          console.error("Error initializing recaptcha:", error);
-          setError("Failed to initialize verification. Please try refreshing the page.");
+        // Make sure the container is visible and has dimensions
+        if (recaptchaContainerRef.current) {
+          recaptchaContainerRef.current.innerHTML = '';
+          recaptchaContainerRef.current.style.width = "100%";
+          recaptchaContainerRef.current.style.height = "80px";
+          recaptchaContainerRef.current.style.display = "block";
         }
+        
+        // Force a small delay to ensure DOM is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Initialize the reCAPTCHA verifier
+        recaptchaVerifierRef.current = await initRecaptchaVerifier("recaptcha-container");
+        console.log("reCAPTCHA initialized successfully");
+        setRecaptchaInitialized(true);
+        setError(null);
+        return true;
+      } catch (error) {
+        console.error("Error initializing recaptcha:", error);
+        setError("Failed to initialize verification. Please try refreshing the page.");
+        return false;
+      }
+    }
+    return false;
+  };
+
+  // Initialize recaptcha when component mounts with retry mechanism
+  useEffect(() => {
+    const attemptInitialization = async () => {
+      // Don't try to initialize if conditions aren't met
+      if (!isAuthInitialized || firebaseLoading || recaptchaInitialized) {
+        return;
+      }
+      
+      // Try to initialize
+      const success = await initializeRecaptcha();
+      
+      // If failed and under max attempts, try again with exponential backoff
+      if (!success && recaptchaInitAttempts.current < 5) {
+        const delay = Math.min(1000 * Math.pow(1.5, recaptchaInitAttempts.current - 1), 8000);
+        console.log(`reCAPTCHA initialization failed, retrying in ${delay}ms`);
+        
+        // Clear any existing timer
+        if (initializationTimerRef.current) {
+          clearTimeout(initializationTimerRef.current);
+        }
+        
+        // Set a new timer for the next attempt
+        initializationTimerRef.current = setTimeout(attemptInitialization, delay);
       }
     };
 
-    // Try to initialize recaptcha after a short delay to ensure DOM is ready
+    // Start initialization process when auth is ready
     if (isAuthInitialized && !recaptchaInitialized && !firebaseLoading) {
-      const timer = setTimeout(() => {
-        initRecaptcha();
-      }, 1500); // Increased delay to ensure DOM is fully rendered
-      
-      return () => clearTimeout(timer);
+      attemptInitialization();
     }
+    
+    // Cleanup function
+    return () => {
+      if (initializationTimerRef.current) {
+        clearTimeout(initializationTimerRef.current);
+      }
+    };
   }, [isAuthInitialized, recaptchaInitialized, firebaseLoading]);
 
   // Check OTP usage on mount
@@ -140,31 +217,13 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
       if (!recaptchaVerifierRef.current || !recaptchaInitialized) {
         console.log("reCAPTCHA not initialized, attempting to initialize now");
         
+        // Reset attempt counter for a fresh start
+        recaptchaInitAttempts.current = 0;
+        
         // Try to initialize recaptcha again
-        try {
-          // Force cleanup of any existing instances
-          const existingRecaptchas = document.querySelectorAll('.grecaptcha-badge');
-          existingRecaptchas.forEach(element => {
-            element.remove();
-          });
-          
-          const iframes = document.querySelectorAll('iframe[src*="recaptcha"]');
-          iframes.forEach(element => {
-            element.remove();
-          });
-          
-          // Make sure the container is visible
-          if (recaptchaContainerRef.current) {
-            recaptchaContainerRef.current.innerHTML = '';
-            recaptchaContainerRef.current.style.width = "100%";
-            recaptchaContainerRef.current.style.height = "80px";
-            recaptchaContainerRef.current.style.display = "block";
-          }
-          
-          recaptchaVerifierRef.current = await initRecaptchaVerifier("recaptcha-container");
-          setRecaptchaInitialized(true);
-        } catch (error) {
-          console.error("Error reinitializing recaptcha:", error);
+        const success = await initializeRecaptcha();
+        
+        if (!success) {
           throw new Error("Could not initialize verification. Please refresh the page and try again.");
         }
       }
@@ -198,11 +257,24 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
           console.error("Failed to update OTP usage count:", e);
         }
       } else {
-        setError((error as { message?: string })?.message || "Failed to send verification code. Please try again.");
+        // If there's a reCAPTCHA error, try to reinitialize it
+        if (error && (error.message?.includes('captcha') || error.code === 'auth/captcha-check-failed')) {
+          cleanupRecaptcha();
+          await initializeRecaptcha();
+          setError("Verification check failed. Please try again.");
+        } else {
+          setError((error as { message?: string })?.message || "Failed to send verification code. Please try again.");
+        }
       }
     } catch (error: any) {
       console.error("Error sending OTP:", error);
       setError(error?.message || "Failed to send verification code. Please try again.");
+      
+      // If there's a reCAPTCHA error, try to reinitialize it
+      if (error.message?.includes('captcha') || error.code === 'auth/captcha-check-failed') {
+        cleanupRecaptcha();
+        await initializeRecaptcha();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -319,7 +391,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
                 
                 {!recaptchaInitialized && !isLoading && (
                   <div className="text-xs text-amber-600 text-center">
-                    Initializing verification... If it doesn't appear, please refresh the page.
+                    Initializing verification... If it doesn't appear, please try refreshing the page.
                   </div>
                 )}
                 
@@ -334,6 +406,20 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
                     "Continue with Phone"
                   )}
                 </Button>
+                
+                {!recaptchaInitialized && recaptchaInitAttempts.current >= 3 && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="w-full text-sm"
+                    onClick={() => {
+                      recaptchaInitAttempts.current = 0;
+                      initializeRecaptcha();
+                    }}
+                  >
+                    Retry verification initialization
+                  </Button>
+                )}
               </form>
             )}
             

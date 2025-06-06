@@ -372,14 +372,23 @@ export default function CheckoutForm() {
 
       if (result.id) {
         clearCart()
-        toast({
-          title: "Order placed successfully!",
-          description: `Your order #${result.id.slice(0, 8).toUpperCase()} has been placed.`,
-        })
+        
+        // Show appropriate message based on whether multiple orders were created
+        if (result.orderCount && result.orderCount > 1) {
+          toast({
+            title: "Orders placed successfully!",
+            description: `Your ${result.orderCount} orders have been placed with different vendors.`,
+          })
+        } else {
+          toast({
+            title: "Order placed successfully!",
+            description: `Your order #${result.id.slice(0, 8).toUpperCase()} has been placed.`,
+          })
+        }
         
         // Use setTimeout to ensure toast is displayed before navigation
         setTimeout(() => {
-        router.push(`/checkout/success?orderId=${result.id}`)
+          router.push(`/checkout/success?orderId=${result.id}${result.allOrderIds ? `&allOrderIds=${result.allOrderIds.join(',')}` : ''}`)
         }, 500)
       }
     } catch (error) {

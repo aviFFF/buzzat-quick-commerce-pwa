@@ -55,6 +55,7 @@ export interface Vendor {
 export interface Order {
   id?: string
   userId: string
+  vendorId?: string
   items: Array<{
     productId: string
     name: string
@@ -326,16 +327,76 @@ export const updateVendor = async (
 // Orders
 export const createOrder = async (orderData: Omit<Order, "id" | "createdAt" | "updatedAt">) => {
   try {
-    const docRef = await addDoc(collection(db, "orders"), {
-      ...orderData,
-      orderStatus: "pending",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-    return { id: docRef.id, ...orderData }
+    // Group items by vendorId
+    const itemsByVendor: Record<string, typeof orderData.items> = {};
+    
+    // First, get vendor information for each product
+    for (const item of orderData.items) {
+      try {
+        // Get product details to find the vendor
+        const product = await getProductById(item.productId);
+        if (product && product.vendorId) {
+          // Group items by vendor
+          if (!itemsByVendor[product.vendorId]) {
+            itemsByVendor[product.vendorId] = [];
+          }
+          itemsByVendor[product.vendorId].push(item);
+        } else {
+          console.error(`Product not found or missing vendorId: ${item.productId}`);
+        }
+      } catch (err) {
+        console.error(`Error getting product info for ${item.productId}:`, err);
+      }
+    }
+    
+    // If we couldn't find any vendors, create order as before
+    if (Object.keys(itemsByVendor).length === 0) {
+      const docRef = await addDoc(collection(db, "orders"), {
+        ...orderData,
+        orderStatus: "pending",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      return { id: docRef.id, ...orderData };
+    }
+    
+    // Create separate orders for each vendor
+    const orderIds = [];
+    for (const [vendorId, items] of Object.entries(itemsByVendor)) {
+      // Calculate subtotal for this vendor's items
+      const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
+      
+      // Split the delivery fee among vendors
+      const deliveryFeePerVendor = orderData.deliveryFee / Object.keys(itemsByVendor).length;
+      
+      // Create a new order for this vendor
+      const vendorOrderData = {
+        ...orderData,
+        items,
+        vendorId, // Add vendorId to the order
+        totalAmount: subtotal + deliveryFeePerVendor, // Recalculate total
+        deliveryFee: deliveryFeePerVendor
+      };
+      
+      const docRef = await addDoc(collection(db, "orders"), {
+        ...vendorOrderData,
+        orderStatus: "pending",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      
+      orderIds.push(docRef.id);
+    }
+    
+    // Return the first order ID and a count of total orders created
+    return { 
+      id: orderIds[0], 
+      orderCount: orderIds.length,
+      allOrderIds: orderIds
+    };
   } catch (error) {
-    console.error("Error creating order:", error)
-    throw error
+    console.error("Error creating order:", error);
+    throw error;
   }
 }
 

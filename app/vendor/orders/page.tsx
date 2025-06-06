@@ -74,6 +74,7 @@ interface Order {
   orderStatus: keyof typeof ORDER_STATUS_COLORS
   updatedAt?: Timestamp
   deliveryPersonId?: string
+  vendorId: string
 }
 
 export default function VendorOrders() {
@@ -92,9 +93,10 @@ export default function VendorOrders() {
     setLoading(true)
     setError(null)
     
-    // Get orders that match the vendor's pincodes
+    // Get orders for this vendor
     const ordersQuery = query(
       collection(db, "orders"),
+      where("vendorId", "==", vendor.id),
       orderBy("createdAt", "desc")
     )
 
@@ -103,7 +105,6 @@ export default function VendorOrders() {
       ordersQuery,
       (snapshot) => {
         try {
-          // Filter orders client-side based on pincode
           const ordersData = snapshot.docs
             .map(doc => {
               try {
@@ -115,6 +116,7 @@ export default function VendorOrders() {
                   id: docId,
                   createdAt: data.createdAt || Timestamp.now(),
                   userId: data.userId || "",
+                  vendorId: data.vendorId || "",
                   items: Array.isArray(data.items) ? data.items.map(item => ({
                     productId: item.productId || "",
                     name: item.name || "Unknown Product",
@@ -139,13 +141,7 @@ export default function VendorOrders() {
                 return null;
               }
             })
-            .filter(order => order !== null) // Remove any orders that failed to process
-            .filter(order => {
-              // Check if order's pincode matches any of the vendor's pincodes
-              const orderPincode = order?.address?.pincode;
-              const vendorPincodes = vendor.pincodes || [];
-              return orderPincode && vendorPincodes.includes(orderPincode);
-            }) as Order[];
+            .filter(order => order !== null); // Remove any orders that failed to process
 
           // Check for new orders in the last 5 minutes
           const fiveMinutesAgo = new Date();
