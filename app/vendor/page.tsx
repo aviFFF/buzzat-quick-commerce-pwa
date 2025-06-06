@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation"
 import { useVendor } from "@/lib/context/vendor-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { ArrowRight, Package, ShoppingBag, DollarSign, Clock, AlertTriangle, TrendingUp, BarChart, Info, User, Settings } from "lucide-react"
+import { ArrowRight, Package, ShoppingBag, DollarSign, Clock, AlertTriangle, TrendingUp, BarChart, Info, User, Settings, RefreshCw } from "lucide-react"
 import { db } from "@/lib/firebase/config"
-import { collection, query, where, orderBy, limit, getDocs } from "firebase/firestore"
+import { collection, query, where, orderBy, limit, getDocs, onSnapshot } from "firebase/firestore"
 import Link from "next/link"
 import dynamic from "next/dynamic"
 import { notificationService } from "@/lib/firebase/notification-service"
@@ -35,6 +35,7 @@ interface DashboardStats {
   productCount: number
   recentOrders: Order[]
   hasLoaded: boolean
+  lastUpdated: Date | null
 }
 
 export default function VendorDashboard() {
@@ -47,10 +48,11 @@ export default function VendorDashboard() {
     lowStockProducts: 0,
     productCount: 0,
     recentOrders: [],
-    hasLoaded: false
+    hasLoaded: false,
+    lastUpdated: null
   })
   const [showNotificationDemo, setShowNotificationDemo] = useState(false)
-  const [recentOrders, setRecentOrders] = useState([])
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Check authentication status
   useEffect(() => {
@@ -64,7 +66,11 @@ export default function VendorDashboard() {
   useEffect(() => {
     if (!vendor?.id) return
 
-    const fetchDashboardData = async () => {
+    let unsubscribeOrders: () => void;
+    let unsubscribeRecentOrders: () => void;
+    let unsubscribeProducts: () => void;
+    
+    const setupListeners = async () => {
       try {
         // For test vendor in development
         if (process.env.NODE_ENV === 'development' && vendor.id === 'test-vendor-id') {
@@ -101,95 +107,137 @@ export default function VendorDashboard() {
                   createdAt: new Date(Date.now() - 7200000)
                 }
               ],
-              hasLoaded: true
-            })
-          }, 1000)
-          return
+              hasLoaded: true,
+              lastUpdated: new Date()
+            });
+          }, 1000);
+          return;
         }
 
-        // Create date range for orders (last 30 days)
-        const thirtyDaysAgo = new Date()
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-        // Fetch orders
-        const ordersQuery = query(
-          collection(db, "orders"),
-          where("vendorId", "==", vendor.id),
-          where("createdAt", ">=", thirtyDaysAgo),
-          orderBy("createdAt", "desc")
-        )
-        const ordersSnapshot = await getDocs(ordersQuery)
+        console.log("Setting up real-time listeners for vendor:", vendor.id);
         
-        // Fetch recent orders
+        // Create date range for orders (last 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        // Real-time listener for recent orders
         const recentOrdersQuery = query(
           collection(db, "orders"),
           where("vendorId", "==", vendor.id),
           orderBy("createdAt", "desc"),
           limit(5)
-        )
-        const recentOrdersSnapshot = await getDocs(recentOrdersQuery)
+        );
         
-        // Fetch products
+        unsubscribeRecentOrders = onSnapshot(recentOrdersQuery, (snapshot) => {
+          const recentOrders = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              orderNumber: data.orderNumber || `ORD-${doc.id.slice(0,6)}`,
+              customerName: data.customerName || "Customer",
+              total: data.total || 0,
+              orderStatus: data.orderStatus || "pending",
+              createdAt: data.createdAt?.toDate() || new Date()
+            } as Order;
+          });
+          
+          // Check if there are new orders
+          if (stats.hasLoaded && recentOrders.length > stats.recentOrders.length) {
+            // Play notification sound for new orders
+            notificationService.playOrderSound();
+          }
+          
+          setStats(prevStats => ({
+            ...prevStats,
+            recentOrders,
+            hasLoaded: true,
+            lastUpdated: new Date()
+          }));
+        });
+        
+        // Real-time listener for all orders
+        const ordersQuery = query(
+          collection(db, "orders"),
+          where("vendorId", "==", vendor.id),
+          where("createdAt", ">=", thirtyDaysAgo)
+        );
+        
+        unsubscribeOrders = onSnapshot(ordersQuery, (snapshot) => {
+          const orders = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data
+            } as Order;
+          });
+          
+          // Calculate total revenue
+          const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
+          
+          // Count pending orders
+          const pendingOrders = orders.filter(order => 
+            order.orderStatus === 'pending' || 
+            order.orderStatus === 'confirmed' || 
+            order.orderStatus === 'preparing'
+          ).length;
+          
+          setStats(prevStats => ({
+            ...prevStats,
+            totalOrders: snapshot.size,
+            totalRevenue,
+            pendingOrders,
+            hasLoaded: true,
+            lastUpdated: new Date()
+          }));
+        });
+        
+        // Real-time listener for products
         const productsQuery = query(
           collection(db, "products"),
           where("vendorId", "==", vendor.id)
-        )
-        const productsSnapshot = await getDocs(productsQuery)
+        );
         
-        // Count products with low stock
-        const lowStockProducts = productsSnapshot.docs.filter(doc => {
-          const data = doc.data()
-          return data.stock <= 5 // Consider low stock if 5 or fewer items
-        }).length
-
-        // Process order data
-        const orders = ordersSnapshot.docs.map(doc => {
-          const data = doc.data()
-          return {
-            id: doc.id,
-            ...data
-          } as Order
-        })
+        unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
+          // Count products with low stock
+          const lowStockProducts = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            return data.stock <= 5; // Consider low stock if 5 or fewer items
+          }).length;
+          
+          setStats(prevStats => ({
+            ...prevStats,
+            lowStockProducts,
+            productCount: snapshot.size,
+            hasLoaded: true,
+            lastUpdated: new Date()
+          }));
+        });
         
-        // Process recent orders
-        const recentOrders = recentOrdersSnapshot.docs.map(doc => {
-          const data = doc.data()
-          return {
-            id: doc.id,
-            orderNumber: data.orderNumber,
-            customerName: data.customerName,
-            total: data.total,
-            orderStatus: data.orderStatus,
-            createdAt: data.createdAt?.toDate() || new Date()
-          } as Order
-        })
-
-        // Calculate total revenue
-        const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0)
-        
-        // Count pending orders
-        const pendingOrders = orders.filter(order => 
-          order.orderStatus === 'pending' || 
-          order.orderStatus === 'confirmed' || 
-          order.orderStatus === 'preparing'
-        ).length
-
-        setStats({
-          totalOrders: ordersSnapshot.size,
-          totalRevenue,
-          pendingOrders,
-          lowStockProducts,
-          productCount: productsSnapshot.size,
-          recentOrders,
-          hasLoaded: true
-        })
       } catch (error) {
-        console.error("Error fetching dashboard data:", error)
+        console.error("Error setting up dashboard listeners:", error);
       }
-    }
-
-    fetchDashboardData()
-  }, [vendor])
+    };
+    
+    setupListeners();
+    
+    // Clean up listeners when component unmounts
+    return () => {
+      console.log("Cleaning up dashboard listeners");
+      if (unsubscribeOrders) unsubscribeOrders();
+      if (unsubscribeRecentOrders) unsubscribeRecentOrders();
+      if (unsubscribeProducts) unsubscribeProducts();
+    };
+  }, [vendor]);
+  
+  // Manual refresh function
+  const refreshDashboard = () => {
+    // This function is just for UI feedback
+    // The real-time listeners will automatically update the data
+    setStats(prev => ({...prev, hasLoaded: false}));
+    setTimeout(() => {
+      setStats(prev => ({...prev, hasLoaded: true, lastUpdated: new Date()}));
+    }, 1000);
+  };
 
   // Request notification permission
   useEffect(() => {
@@ -251,6 +299,23 @@ export default function VendorDashboard() {
             <p className="text-sm sm:text-base text-indigo-700">
               Welcome back, <span className="font-semibold">{vendor.name}</span>! Here's an overview of your store.
             </p>
+            {stats.lastUpdated && (
+              <div className="flex items-center mt-1">
+                <p className="text-xs text-indigo-500">
+                  Last updated: {stats.lastUpdated.toLocaleTimeString()}
+                </p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="ml-2 h-6 w-6 p-0 text-indigo-600" 
+                  onClick={refreshDashboard}
+                  disabled={!stats.hasLoaded}
+                >
+                  <RefreshCw className={`h-3 w-3 ${!stats.hasLoaded ? 'animate-spin' : ''}`} />
+                  <span className="sr-only">Refresh</span>
+                </Button>
+              </div>
+            )}
           </div>
           <div className="flex items-center space-x-2">
             <Button 

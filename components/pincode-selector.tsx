@@ -30,8 +30,8 @@ export default function PincodeSelector({ headerStyle = false }: PincodeSelector
   // Check if on admin or vendor pages - do this check early
   const isAdminOrVendor = isAdminOrVendorPage(pathname)
   
-  // Don't render on admin or vendor pages
-  if (isAdminOrVendor) {
+  // Only show on homepage (/) and not on admin or vendor pages
+  if (isAdminOrVendor || pathname !== '/') {
     return null
   }
   
@@ -272,10 +272,10 @@ export default function PincodeSelector({ headerStyle = false }: PincodeSelector
               <Button
                 type="submit"
                 onClick={handleSubmit}
-                disabled={isLoading || !pincode || pincode.length !== 6}
+                disabled={isLoading || !inputPincode || inputPincode.length !== 6 || isChecking}
                 className={`w-full ${getButtonClass(pathname)}`}
               >
-                {isLoading ? "Checking..." : "Apply"}
+                {isChecking ? "Checking..." : "Apply"}
               </Button>
             </form>
           </div>

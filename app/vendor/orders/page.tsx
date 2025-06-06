@@ -230,16 +230,16 @@ export default function VendorOrders() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Orders</h1>
-          <p className="text-gray-500">Manage orders for your delivery areas</p>
+          <h1 className="text-xl sm:text-3xl font-bold">Orders</h1>
+          <p className="text-sm text-gray-500">Manage orders for your delivery areas</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <OrderNotification 
             newOrdersCount={newOrdersCount}
             onClick={() => setFilterStatus('pending')}
           />
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
@@ -253,98 +253,122 @@ export default function VendorOrders() {
       </div>
 
       {error && (
-        <Card className="bg-red-50 border-red-200">
-          <CardContent className="p-4">
-            <p className="text-red-800">{error}</p>
-          </CardContent>
-        </Card>
+        <div className="bg-red-50 text-red-600 p-4 rounded-md my-4">
+          {error}
+        </div>
       )}
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Order List</CardTitle>
-          <div className="text-sm text-muted-foreground">
-            Showing orders for pincodes: {(vendor.pincodes || []).join(', ')}
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      ) : filteredOrders.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Bell className="h-12 w-12 text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-center">No orders found</h3>
+            <p className="text-sm text-gray-500 text-center mt-2">
+              {filterStatus === "all" 
+                ? "You don't have any orders yet." 
+                : `You don't have any ${ORDER_STATUS_LABELS[filterStatus as keyof typeof ORDER_STATUS_LABELS].toLowerCase()} orders.`}
+            </p>
+            {filterStatus !== "all" && (
+              <Button variant="outline" className="mt-4" onClick={() => setFilterStatus("all")}>
+                View all orders
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Mobile view - card list */}
+          <div className="grid gap-4 md:hidden">
+            {filteredOrders.map((order) => (
+              <Card key={order.id} className="cursor-pointer" onClick={() => handleOrderClick(order.id)}>
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-medium">Order #{order.id.slice(0, 8).toUpperCase()}</p>
+                      <p className="text-xs text-gray-500">
+                        {order.createdAt ? new Date(order.createdAt.toDate()).toLocaleString() : 'Unknown date'}
+                      </p>
+                    </div>
+                    <Badge className={ORDER_STATUS_COLORS[order.orderStatus]}>
+                      {ORDER_STATUS_LABELS[order.orderStatus]}
+                    </Badge>
+                  </div>
+                  
+                  <div className="border-t border-gray-100 pt-3 mt-2">
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm text-gray-600">Customer:</p>
+                      <p className="text-sm font-medium">{order.address?.name || "Unknown"}</p>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm text-gray-600">Items:</p>
+                      <p className="text-sm font-medium">{order.items?.length || 0}</p>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <p className="text-sm text-gray-600">Total:</p>
+                      <p className="text-sm font-medium">₹{order.totalAmount?.toFixed(2) || 0}</p>
+                    </div>
+                    <div className="flex justify-between">
+                      <p className="text-sm text-gray-600">Payment:</p>
+                      <p className="text-sm font-medium capitalize">{order.paymentMethod}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center items-center p-8">
-              <p>Loading orders...</p>
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="flex justify-center items-center p-8">
-              <p className="text-gray-500">No orders found</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order #</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Items</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+          
+          {/* Desktop view - table */}
+          <div className="hidden md:block rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order #</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Payment</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders.map((order) => (
+                  <TableRow 
+                    key={order.id} 
+                    className="cursor-pointer hover:bg-gray-50" 
+                    onClick={() => handleOrderClick(order.id)}
+                  >
+                    <TableCell className="font-medium">
+                      {order.id.slice(0, 8).toUpperCase()}
+                    </TableCell>
+                    <TableCell>{order.address?.name || "Unknown"}</TableCell>
+                    <TableCell>
+                      {order.createdAt ? new Date(order.createdAt.toDate()).toLocaleString() : 'Unknown date'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={ORDER_STATUS_COLORS[order.orderStatus]}>
+                        {ORDER_STATUS_LABELS[order.orderStatus]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {order.paymentMethod} 
+                      <span className="text-xs ml-1 capitalize">
+                        ({order.paymentStatus})
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      ₹{order.totalAmount?.toFixed(2) || 0}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.map((order) => {
-                    let formattedDate = 'Unknown date';
-                    try {
-                      if (order.createdAt?.toDate) {
-                        formattedDate = new Date(order.createdAt.toDate()).toLocaleDateString();
-                      }
-                    } catch (err) {
-                      console.error("Error formatting date:", err);
-                    }
-
-                    return (
-                      <TableRow 
-                        key={order.id} 
-                        className={`cursor-pointer hover:bg-gray-50 ${order.orderStatus === 'pending' ? 'bg-yellow-50' : ''}`}
-                        onClick={() => handleOrderClick(order.id)}
-                      >
-                        <TableCell className="font-medium">{order.id.slice(0, 8).toUpperCase()}</TableCell>
-                        <TableCell>{formattedDate}</TableCell>
-                        <TableCell>{order.address?.name || 'Unknown'}</TableCell>
-                        <TableCell>{Array.isArray(order.items) ? order.items.length : 0} items</TableCell>
-                        <TableCell>₹{(order.totalAmount || 0).toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Badge className={`${ORDER_STATUS_COLORS[order.orderStatus] || 'bg-gray-100 text-gray-800'} px-2 py-1`}>
-                            {ORDER_STATUS_LABELS[order.orderStatus] || 'Unknown'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={order.paymentStatus === "paid" ? "outline" : "secondary"}>
-                            {order.paymentMethod === "cod" ? "COD" : "Online"} • 
-                            {order.paymentStatus === "paid" ? " Paid" : " Pending"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOrderClick(order.id);
-                            }}
-                          >
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      )}
     </div>
   )
 } 

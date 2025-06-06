@@ -56,9 +56,14 @@ export const initRecaptchaVerifier = async (containerId: string) => {
       element.remove();
     });
 
+    // Log debug information about the environment
+    console.log("Current hostname:", window.location.hostname);
+    console.log("Firebase auth domain:", auth.app.options.authDomain);
+    console.log("Using recaptcha size:", process.env.NODE_ENV === "development" ? "normal" : "invisible");
+
     // Create a new RecaptchaVerifier instance
     const verifier = new RecaptchaVerifier(auth, containerId, {
-      size: "invisible",
+      size: process.env.NODE_ENV === "development" ? "normal" : "invisible",
       callback: () => {
         console.log("Recaptcha verified")
       },
@@ -73,11 +78,20 @@ export const initRecaptchaVerifier = async (containerId: string) => {
     })
     
     // Render the recaptcha to ensure it's ready
-    await verifier.render()
+    await verifier.render();
     
-    return verifier
-  } catch (error) {
+    return verifier;
+  } catch (error: any) {
     console.error("Error initializing RecaptchaVerifier:", error)
+    
+    // Add specific error handling for hostname validation issues
+    if (error.message && error.message.includes("hostname")) {
+      console.error("Hostname validation error detected");
+      console.error("Current hostname:", window.location.hostname);
+      console.error("Expected Firebase auth domain:", auth?.app?.options?.authDomain);
+      throw new Error("Domain verification failed. Please ensure your domain is authorized in the Firebase console.");
+    }
+    
     throw error
   }
 }

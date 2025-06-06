@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { AlertCircle, Loader2, Trash2, Edit, ShoppingBag } from "lucide-react"
+import { AlertCircle, Loader2, Trash2, Edit, ShoppingBag, Package } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from "@/components/ui/use-toast"
 import {
@@ -262,10 +262,13 @@ export default function VendorProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Products</h1>
-        <Button asChild>
-          <Link href="/vendor/products/add">Add New Product</Link>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Products</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage your product inventory</p>
+        </div>
+        <Button asChild className="w-full sm:w-auto">
+          <Link href="/vendor/products/add">Add Product</Link>
         </Button>
       </div>
 
@@ -276,160 +279,187 @@ export default function VendorProductsPage() {
         </Alert>
       )}
 
-      <div className="grid gap-6 md:grid-cols-3">
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+        </div>
+      ) : products.length === 0 ? (
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Products</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{products.length}</div>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <ShoppingBag className="h-12 w-12 text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-center">No products found</h3>
+            <p className="text-sm text-gray-500 text-center mt-2">
+              Get started by adding your first product.
+            </p>
+            <Button asChild className="mt-4">
+              <Link href="/vendor/products/add">Add Product</Link>
+            </Button>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Active Products</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{products.filter((p) => p.status === "active").length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Out of Stock</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{products.filter((p) => p.status === "out_of_stock").length}</div>
-          </CardContent>
-        </Card>
-      </div>
+      ) : (
+        <>
+          {/* Mobile view - card list */}
+          <div className="grid gap-4 md:hidden">
+            {products.map(product => (
+              <Card key={product.id} className="overflow-hidden">
+                <div className="flex items-center p-4">
+                  <div className="relative h-16 w-16 rounded-md overflow-hidden mr-4 flex-shrink-0">
+                    {product.image ? (
+                      <Image
+                        src={product.image}
+                        alt={product.name}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="bg-gray-100 flex items-center justify-center h-full w-full">
+                        <ShoppingBag className="h-6 w-6 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-base truncate">{product.name}</h3>
+                    <p className="text-sm text-gray-500 truncate">{product.categoryName || product.category}</p>
+                    <div className="flex items-center mt-1">
+                      <span className="font-medium text-base">₹{product.price}</span>
+                      {product.mrp > product.price && (
+                        <span className="ml-2 text-xs text-gray-500 line-through">₹{product.mrp}</span>
+                      )}
+                    </div>
+                  </div>
+                  <Badge className={product.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                    {product.status === "active" ? "In Stock" : "Out of Stock"}
+                  </Badge>
+                </div>
+                <div className="border-t flex divide-x">
+                  <Button 
+                    variant="ghost" 
+                    className="flex-1 rounded-none h-12"
+                    onClick={() => startEditingPrice(product.id, product.price)}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Price
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    className="flex-1 rounded-none h-12"
+                    onClick={() => toggleProductStatus(product.id, product.status)}
+                  >
+                    {product.status === "active" ? "Out" : "In"}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    className="flex-1 rounded-none h-12 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => setProductToDelete(product)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Product Management</CardTitle>
-          <CardDescription>Manage your products, update stock, or change availability.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="py-8 text-center">
-              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-              <p>Loading products...</p>
-            </div>
-          ) : products.length === 0 ? (
-            <div className="py-8 text-center">
-              <ShoppingBag className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 mb-4">No products found.</p>
-              <Button asChild>
-                <Link href="/vendor/products/add">Add Your First Product</Link>
-              </Button>
-            </div>
-          ) : (
+          {/* Desktop view - table */}
+          <div className="hidden md:block border rounded-md">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product</TableHead>
+                  <TableHead className="w-[80px]">Image</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Price</TableHead>
-                  <TableHead>Stock Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map((product) => (
+                {products.map(product => (
                   <TableRow key={product.id}>
                     <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-10 w-10 rounded-md overflow-hidden">
+                      <div className="relative h-10 w-10 rounded-md overflow-hidden">
+                        {product.image ? (
                           <Image
-                            src={product.image || "/placeholder.svg"}
+                            src={product.image}
                             alt={product.name}
                             fill
                             className="object-cover"
                           />
-                        </div>
-                        <span className="font-medium">{product.name}</span>
+                        ) : (
+                          <div className="bg-gray-100 flex items-center justify-center h-full w-full">
+                            <ShoppingBag className="h-5 w-5 text-gray-400" />
+                          </div>
+                        )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{product.name}</div>
+                      <div className="text-sm text-gray-500">{product.unit}</div>
                     </TableCell>
                     <TableCell>{product.categoryName || product.category}</TableCell>
                     <TableCell>
-                      {editingProduct?.id === product.id ? (
+                      {editingProduct && editingProduct.id === product.id ? (
                         <div className="flex items-center space-x-2">
                           <Input
-                            className="w-24"
                             type="number"
                             value={editingProduct.price}
-                            onChange={(e) => setEditingProduct({
-                              ...editingProduct,
-                              price: parseFloat(e.target.value)
-                            })}
+                            onChange={(e) => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) })}
+                            className="w-24"
+                            min={1}
                           />
                           <Button size="sm" onClick={updateProductPrice}>Save</Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEditingProduct(null)}
-                          >
-                            Cancel
-                          </Button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center space-x-2">
                           <span>₹{product.price}</span>
+                          {product.mrp > product.price && (
+                            <span className="text-xs text-gray-500 line-through">₹{product.mrp}</span>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => startEditingPrice(product.id, product.price)}
                           >
-                            Edit
+                            <Edit className="h-3 w-3" />
                           </Button>
                         </div>
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center space-x-2">
                         <Switch
                           checked={product.status === "active"}
                           onCheckedChange={() => toggleProductStatus(product.id, product.status)}
                         />
-                        <Badge
-                          variant={product.status === "active" ? "default" : "secondary"}
-                        >
+                        <span className={product.status === "active" ? "text-green-600" : "text-red-600"}>
                           {product.status === "active" ? "In Stock" : "Out of Stock"}
-                        </Badge>
+                        </span>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/vendor/products/edit/${product.id}`}>
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Link>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-red-500 hover:text-red-700"
-                          onClick={() => setProductToDelete(product)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setProductToDelete(product)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </>
+      )}
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!productToDelete} onOpenChange={() => !isDeleting && setProductToDelete(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogTitle>Delete Product</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to delete <span className="font-medium">{productToDelete?.name}</span>? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -451,7 +481,7 @@ export default function VendorProductsPage() {
                   Deleting...
                 </>
               ) : (
-                "Delete Product"
+                "Delete"
               )}
             </Button>
           </DialogFooter>

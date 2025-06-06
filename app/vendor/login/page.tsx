@@ -147,63 +147,63 @@ export default function VendorLogin() {
             </div>
             <CardTitle className="text-2xl text-center font-bold bg-gradient-to-r from-indigo-600 to-purple-700 bg-clip-text text-transparent">Vendor Portal</CardTitle>
             <CardDescription className="text-center">Login to manage your store and orders</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {error && (
+        </CardHeader>
+        <CardContent>
+          {error && (
               <Alert variant="destructive" className="mb-4 border-red-300 bg-red-50">
-                <AlertCircle className="h-4 w-4" />
+              <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="font-medium">{error}</AlertDescription>
-              </Alert>
-            )}
+            </Alert>
+          )}
 
             <Alert className="mb-6 border-indigo-200 bg-indigo-50">
               <ShieldCheck className="h-4 w-4 text-indigo-600" />
               <AlertTitle className="font-semibold text-indigo-800">Admin Approval Required</AlertTitle>
               <AlertDescription className="text-indigo-700">
-                Only vendors that have been approved by an admin can login.
-                If you're having trouble logging in, please contact support.
-              </AlertDescription>
-            </Alert>
+              Only vendors that have been approved by an admin can login.
+              If you're having trouble logging in, please contact support.
+            </AlertDescription>
+          </Alert>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
+            <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-gray-700">
                   Email Address
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="vendor@example.com"
+              </label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="vendor@example.com"
                   className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
+                required
+              />
+            </div>
+            <div className="space-y-2">
                 <label htmlFor="password" className="text-sm font-medium text-gray-700">
-                  Password
-                </label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                Password
+              </label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
                   className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
-                  required
-                />
-              </div>
-              <Button
-                type="submit"
+                required
+              />
+            </div>
+            <Button
+              type="submit"
                 className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 py-6"
-                disabled={isSubmitting || isLoading}
-              >
+              disabled={isSubmitting || isLoading}
+            >
                 {isSubmitting || isLoading ? "Logging in..." : "Login to Dashboard"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
       </div>
     </div>
   )

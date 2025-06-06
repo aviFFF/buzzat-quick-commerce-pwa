@@ -45,13 +45,23 @@ export const AUTH_CONFIG = {
   ENABLE_PHONE_AUTH: true,
   DAILY_OTP_LIMIT: 5,
   OTP_USAGE_STORAGE_KEY: 'otp_usage',
-  OTP_LIMIT_MESSAGE: 'Daily OTP limit reached. Please use Google Sign-In instead.',
+  OTP_LIMIT_MESSAGE: 'Daily OTP limit reached. Please try again tomorrow.',
   
-  // Google authentication settings
-  ENABLE_GOOGLE_AUTH: true,
+  // Google authentication settings (disabled)
+  ENABLE_GOOGLE_AUTH: false,
   
   // Debug settings
   DEBUG_AUTH: process.env.NODE_ENV === 'development',
+  
+  // Domain settings for reCAPTCHA
+  // The list of domains that should be considered valid for reCAPTCHA verification
+  // This is useful for development environments where the hostname might not match the Firebase auth domain
+  ALLOWED_DOMAINS: [
+    'localhost', 
+    '127.0.0.1',
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.split('.')[0] || '',
+    process.env.NEXT_PUBLIC_SITE_DOMAIN || ''
+  ]
 }
 
 // Export Firebase config for use in other files

@@ -119,6 +119,17 @@ export class NotificationService {
   }
   
   /**
+   * Play order notification sound
+   * Used specifically for new orders in the dashboard
+   */
+  public playOrderSound(): void {
+    // Only play sound if we're allowed to show notifications
+    if (this.notificationPermission === 'granted') {
+      this.playSound();
+    }
+  }
+  
+  /**
    * Show a notification
    */
   public async showNotification(options: NotificationOptions): Promise<boolean> {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
-import { BarChart3, Home, Package, Settings, ShoppingBag, User, Menu, X, BellRing } from "lucide-react"
+import { BarChart3, Home, Package, Settings, ShoppingBag, User, Menu, X, BellRing, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VendorProvider, useVendor } from "@/lib/context/vendor-provider"
 import { Sidebar } from "@/components/vendor/sidebar"
@@ -110,7 +110,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
         ) : (
           <div className="flex min-h-screen flex-col">
             {/* Mobile Header with hamburger menu */}
-            <header className="sticky top-0 z-40 border-b bg-background md:hidden">
+            <header className="sticky top-0 z-40 border-b bg-gradient-to-r from-indigo-600 to-blue-700 text-white shadow-md md:hidden">
               <div className="flex h-16 items-center px-4">
                 <div className="flex items-center justify-between w-full">
                   <Link href="/vendor" className="font-semibold text-lg flex items-center">
@@ -120,9 +120,9 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
                   
                   <div className="flex items-center gap-4">
                     <Link href="/vendor/orders" className="relative">
-                      <BellRing className="h-5 w-5" />
+                      <BellRing className="h-5 w-5 text-white hover:text-blue-200 transition-colors" />
                       {newOrdersCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center animate-pulse">
                           {newOrdersCount}
                         </span>
                       )}
@@ -130,12 +130,12 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
                     
                     <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
                       <SheetTrigger asChild>
-                        <Button variant="outline" size="icon" className="md:hidden">
+                        <Button variant="ghost" size="icon" className="md:hidden text-white hover:bg-blue-700">
                           <Menu className="h-5 w-5" />
                           <span className="sr-only">Toggle Menu</span>
                         </Button>
                       </SheetTrigger>
-                      <SheetContent side="left" className="pr-0 sm:max-w-xs">
+                      <SheetContent side="left" className="pr-0 sm:max-w-xs bg-gradient-to-b from-indigo-50 to-white">
                         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                         <div className="px-2">
                           <Sidebar onNavItemClick={() => setSidebarOpen(false)} />
@@ -149,7 +149,13 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
             
             <div className="container flex-1 items-start md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10">
               {/* Desktop sidebar - hidden on mobile */}
-              <aside className="fixed top-0 z-30 hidden h-screen w-[220px] border-r bg-background px-2 py-4 md:sticky md:block lg:w-[240px]">
+              <aside className="fixed top-0 z-30 hidden h-screen w-[220px] border-r bg-gradient-to-b from-indigo-50 via-blue-50 to-white px-2 py-4 md:sticky md:block lg:w-[240px]">
+                <div className="mb-6 flex items-center px-4">
+                  <ShoppingBag className="h-6 w-6 text-indigo-600 mr-2" />
+                  <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-blue-700 bg-clip-text text-transparent">
+                    Vendor Portal
+                  </h2>
+                </div>
                 <Sidebar />
               </aside>
               

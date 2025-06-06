@@ -340,7 +340,7 @@ export default function Header() {
               <Button 
                 type="button" 
                 variant="outline" 
-                className="w-full flex items-center justify-center gap-2"
+                className="w-full flex items-center justify-center"
                 onClick={getCurrentLocation}
                 disabled={useCurrentLocation || isLoadingAddress || isChecking}
               >
@@ -400,7 +400,7 @@ export default function Header() {
             </div>
           </div>
 
-          <div className="flex relative w-1/2 max-w-md">
+          <div className="flex relative w-1/2 max-w-xl">
             <ProductSearch />
           </div>
 
